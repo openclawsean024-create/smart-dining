@@ -83,7 +83,15 @@ git commit -m "chore: switch prisma to postgresql for prod"
 git push
 ```
 
-Railway 會自動偵測 push 重新部署,跑 npm run db:push && npm run db:seed && npm start。
+Railway 會自動偵測 push 重新部署,流程:
+
+1. `npm ci --include=dev` — 安裝 dev deps(給 prisma 用)
+2. `npm run build` — `prisma generate` + `tsc`(產出 dist/)
+3. `npm run db:push` — 同步 schema 到 Postgres
+4. `npm run db:seed` — 寫入 demo 資料(⚠️ 每次啟動會清空再重建,demo 用)
+5. `npm start` — `node dist/server.js`
+
+> ⚠️ **Seed 是破壞性的**:每次重啟都會清空資料再寫入 demo 資料。正式營運請把 `npm run db:seed` 從 startCommand 移除,改成用 prisma migrate 管理正式資料。
 
 ### 2.5 取得 Backend 網址
 

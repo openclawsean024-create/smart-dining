@@ -6,14 +6,15 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/server.js",
     "db:push": "prisma db push --schema=./prisma/schema.prisma",
     "db:seed": "tsx src/seed.ts",
     "db:reset": "rm -f data/dev.db && prisma db push --schema=./prisma/schema.prisma && tsx src/seed.ts",
     "test:e2e": "node scripts/e2e.mjs",
     "test:api": "bash scripts/test-api.sh",
-    "test:ws": "node scripts/ws-test.mjs"
+    "test:ws": "node scripts/ws-test.mjs",
+    "postinstall": "prisma generate || true"
   },
   "prisma": {
     "schema": "prisma/schema.prisma"
