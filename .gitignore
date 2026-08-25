@@ -71,3 +71,7 @@ shared-contracts/src/**/*.d.ts.map
 # TypeScript build info
 *.tsbuildinfo
 .tsbuild-node/
+# Temporary secrets
+.jwt-secret.txt
+.vercel
+.env*
