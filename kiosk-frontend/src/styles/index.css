@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === Design Spec tokens === */
+:root {
+  --color-primary: #ff6b35;
+  --color-secondary: #2d6a4f;
+  --color-accent: #ffb627;
+  --color-gray-900: #1f2937;
+  --color-gray-500: #6b7280;
+  --color-gray-50: #f3f4f6;
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-container: 20px;
+}
+
+:root {
+  font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui,
+    sans-serif;
+  font-size: 18px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  color: var(--color-gray-900);
+  background: var(--color-gray-50);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* KIOSK default 1024x768 直式 — 隱藏捲軸但允許內容區自捲 */
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* 自訂按鈕按下效果 */
+.btn-press {
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 200ms ease,
+    color 200ms ease;
+}
+.btn-press:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* 隱藏 number input 的上下箭頭 */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* Dashboard 通用 scrollbar 樣式 */
+.dash-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.dash-scroll::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 4px;
+}
+.dash-scroll::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* 列印樣式(CompletePage 列印取餐單) */
+@media print {
+  html,
+  body,
+  #root {
+    overflow: visible;
+    background: white;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 24px;
+  }
+}
+.print-only {
+  display: none;
+}

@@ -1,0 +1,1 @@
+export const DEMO_VERIFY_CODE='1234'; export function verifyCode(code:string):boolean{return code===DEMO_VERIFY_CODE;}

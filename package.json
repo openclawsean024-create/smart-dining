@@ -1,0 +1,21 @@
+{
+  "name": "smart-dining",
+  "version": "0.1.0",
+  "private": true,
+  "description": "餐飲點餐快手 — Smart Dining Self-Ordering & Tracking System",
+  "workspaces": [
+    "shared-contracts",
+    "backend",
+    "kiosk-frontend",
+    "mobile-app"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "clean": "rm -rf */dist */node_modules ./*.db"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,1 @@
+import 'dotenv/config'; import { z } from 'zod'; const schema=z.object({DATABASE_URL:z.string().min(1),JWT_SECRET:z.string().min(8),PORT:z.coerce.number().int().positive().default(4000),CORS_ORIGIN:z.string().default('http://localhost:5173,http://localhost:5174')}); export const env=schema.parse(process.env);

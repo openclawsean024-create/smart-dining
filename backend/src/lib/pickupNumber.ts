@@ -1,0 +1,1 @@
+import type { PrismaClient } from '@prisma/client'; const start=new Date(); start.setHours(0,0,0,0); export async function nextPickupNumber(prisma:PrismaClient):Promise<number>{const result=await prisma.order.aggregate({where:{createdAt:{gte:start}},_max:{pickupNumber:true}}); return (result._max.pickupNumber??0)+1;}

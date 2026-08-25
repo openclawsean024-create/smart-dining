@@ -1,0 +1,144 @@
+// Smart Dining — Prisma schema (Postgres-compatible)
+// 
+// Dev: SQLite (backend/data/dev.db)
+// Prod: PostgreSQL (Railway / Neon / Supabase / Vercel Postgres)
+//
+// 使用方式:
+//   dev:  DATABASE_URL="file:./data/dev.db" prisma db push
+//   prod: DATABASE_URL="postgresql://..." prisma db push
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"  // 本機 dev 用 sqlite;prod 部署時改成 "postgresql" 並跑 prisma generate
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Member
+// ============================================================
+model Member {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String?
+  points    Int      @default(0)
+  tier      String   @default("BRONZE")
+  createdAt DateTime @default(now())
+
+  coupons            Coupon[]
+  orders             Order[]
+  pointsTransactions PointsTransaction[]
+}
+
+model Coupon {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  type      String
+  value     Float
+  expiresAt DateTime
+  usedAt    DateTime?
+  memberId  String?
+
+  member Member? @relation(fields: [memberId], references: [id])
+}
+
+model Category {
+  id           String  @id @default(cuid())
+  name         String
+  displayOrder Int     @default(0)
+  icon         String?
+
+  menuItems MenuItem[]
+}
+
+model MenuItem {
+  id          String  @id @default(cuid())
+  categoryId  String
+  name        String
+  basePrice   Float
+  imageUrl    String?
+  description String?
+  available   Boolean @default(true)
+  tags        String?
+
+  category            Category             @relation(fields: [categoryId], references: [id])
+  customizationGroups CustomizationGroup[]
+  orderItems          OrderItem[]
+}
+
+model CustomizationGroup {
+  id           String  @id @default(cuid())
+  menuItemId   String
+  groupName    String
+  type         String
+  required     Boolean @default(false)
+  displayOrder Int     @default(0)
+
+  menuItem MenuItem             @relation(fields: [menuItemId], references: [id])
+  choices  CustomizationChoice[]
+}
+
+model CustomizationChoice {
+  id         String  @id @default(cuid())
+  groupId    String
+  name       String
+  priceDelta Float   @default(0)
+  available  Boolean @default(true)
+
+  group CustomizationGroup @relation(fields: [groupId], references: [id])
+}
+
+model Order {
+  id                String    @id @default(cuid())
+  orderNo           String    @unique
+  memberId          String?
+  totalAmount       Float
+  subtotal          Float
+  discount          Float     @default(0)
+  status            String    @default("QUEUED")
+  pickupNumber      Int
+  estimatedReadyAt  DateTime
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  member     Member?          @relation(fields: [memberId], references: [id])
+  items      OrderItem[]
+  statusLogs OrderStatusLog[]
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  menuItemId    String
+  name          String
+  quantity      Int
+  unitPrice     Float
+  customizations String
+  subtotal      Float
+
+  order    Order    @relation(fields: [orderId], references: [id])
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+}
+
+model OrderStatusLog {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    String
+  changedAt DateTime @default(now())
+  changedBy String
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model PointsTransaction {
+  id        String   @id @default(cuid())
+  memberId  String
+  delta     Int
+  reason    String
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+}
