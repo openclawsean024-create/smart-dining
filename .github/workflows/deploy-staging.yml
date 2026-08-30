@@ -1,0 +1,132 @@
+name: deploy-staging
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you redeploying?'
+        required: false
+        default: 'manual redeploy'
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false  # never cancel a deploy mid-flight
+
+# Customized for smart-dining monorepo: deploys 3 targets sequentially
+# (KIOSK → mobile → backend) so the backend is reachable when the frontends boot.
+# Each target uses its own GH Actions secret — see docs/AUTOMATION.md §Layer 2.
+
+jobs:
+  build:
+    name: build all workspaces
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+
+  deploy-kiosk:
+    name: deploy KIOSK to Vercel (staging)
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging-kiosk
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: '20'
+      - name: Deploy to Vercel (KIOSK)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_KIOSK_PROJECT_ID }}
+        run: |
+          npm install -g vercel@latest
+          # vercel.kiosk.json is the project config; Vercel reads it automatically
+          vercel link --yes --token "$VERCEL_TOKEN" \
+            --project "$VERCEL_PROJECT_ID"
+          vercel deploy --yes --token "$VERCEL_TOKEN" \
+            --target staging \
+            --build-env NODE_ENV=staging
+
+  deploy-mobile:
+    name: deploy mobile to Vercel (staging)
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging-mobile
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: '20'
+      - name: Deploy to Vercel (mobile)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MOBILE_PROJECT_ID }}
+        run: |
+          npm install -g vercel@latest
+          vercel link --yes --token "$VERCEL_TOKEN" \
+            --project "$VERCEL_PROJECT_ID"
+          vercel deploy --yes --token "$VERCEL_TOKEN" \
+            --target staging \
+            --build-env NODE_ENV=staging
+
+  deploy-backend:
+    name: deploy backend to Railway (staging)
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging-backend
+      url: ${{ steps.smoke.outputs.deployment_url }}
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: '20'
+      - name: Deploy to Railway
+        id: deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          npm install -g @railway/cli@latest
+          cd backend
+          railway up \
+            --service "${RAILWAY_SERVICE:-smart-dining-backend}" \
+            --environment staging \
+            --token "$RAILWAY_TOKEN"
+          echo "deployment_url=https://smart-dining-backend-staging.up.railway.app" >> "$GITHUB_OUTPUT"
+
+      - name: Post-deploy smoke (backend /healthz)
+        id: smoke
+        env:
+          DEPLOYED_URL: ${{ steps.deploy.outputs.deployment_url }}
+        run: |
+          chmod +x scripts/post-deploy-smoke.sh
+          SMOKE_PATHS="/healthz" ./scripts/post-deploy-smoke.sh "$DEPLOYED_URL"
+
+  notify:
+    name: Slack notification
+    needs: [deploy-kiosk, deploy-mobile, deploy-backend]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "🚨 Staging deploy ${{ needs.deploy-backend.result }} for smart-dining @ ${{ github.ref }}\nKIOSK: ${{ needs.deploy-kiosk.result }} | mobile: ${{ needs.deploy-mobile.result }} | backend: ${{ needs.deploy-backend.result }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
