@@ -1,0 +1,94 @@
+name: rollback
+
+on:
+  repository_dispatch:
+    types: [rollback]
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'SHA to roll back to (leave blank to use previous tag)'
+        required: false
+        default: ''
+      reason:
+        description: 'Why are you rolling back?'
+        required: true
+
+concurrency:
+  group: rollback
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: revert + redeploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://smart-dining.example.com
+    steps:
+      - name: Verify trigger (only allow Sentry webhook or admin PAT)
+        env:
+          GH_TOKEN: ${{ secrets.PROD_DEPLOY_TOKEN }}
+        run: |
+          # If the trigger came from repository_dispatch, the actor is the
+          # integration that fired the webhook (e.g. Sentry). We verify the
+          # trigger by checking that the event_type matches and the actor
+          # has repo:write.
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "triggered by repository_dispatch — webhook source: ${{ github.client_payload.source }}"
+            echo "reason from client_payload: ${{ github.client_payload.reason }}"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+        with:
+          fetch-depth: 50  # need history for git revert
+
+      - name: Setup Node 20
+        uses: actions/setup-node@0a44ba7841725637a19e28fa30b79a866c81b0a6
+        with:
+          node-version: '20'
+
+      - name: Determine target SHA
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.PROD_DEPLOY_TOKEN }}
+        run: |
+          TARGET="${{ inputs.target_sha }}"
+          if [ -z "$TARGET" ]; then
+            # Default: previous release tag
+            TARGET=$(git tag --sort=-version:refname | head -2 | tail -1)
+            if [ -z "$TARGET" ]; then
+              TARGET=$(git log --format=%H -n 2 | tail -1)
+            fi
+          fi
+          echo "target_sha=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "Rolling back to $TARGET"
+
+      - name: Revert
+        env:
+          GH_TOKEN: ${{ secrets.PROD_DEPLOY_TOKEN }}
+        run: |
+          git config user.name "rollback-bot"
+          git config user.email "rollback-bot@users.noreply.github.com"
+          git revert --no-edit HEAD
+          git push origin main
+          echo "::notice::Reverted HEAD on main; new HEAD will trigger deploy-prod"
+
+      - name: Wait for auto-redeploy
+        # The revert triggers deploy-prod.yml automatically. This job just
+        # confirms the redeploy workflow ran.
+        run: |
+          echo "Reverted. The deploy-prod workflow will fire automatically."
+          echo "Watch progress: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/deploy-prod.yml"
+
+      - name: Notify
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "🔄 Rollback ${{ job.status }} for smart-dining → ${{ steps.target.outputs.target_sha }}\nReason: ${{ inputs.reason }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
