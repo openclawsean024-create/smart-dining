@@ -327,3 +327,5 @@ MIT License
 - **版本**: `@smart-dining/backend@0.1.0` / `@smart-dining/kiosk@0.1.0` / `@smart-dining/mobile@0.1.0`
 - **整合測試**: 詳見 [docs/QA-REPORT.md](./docs/QA-REPORT.md)(P1 admin-advance broadcast 已修補)
 - **下一步**: v1.1 多門市、v1.2 第三方外送接單(見 ARCHITECTURE.md Roadmap 章節)
+
+<!-- Last validated: 2026-09-06 by OpenClaw Overnight Dev -->
