@@ -36,7 +36,9 @@ CI 首次執行（PR #3）`test` job 失敗，已修正：
 - KIOSK 元件測試在 Node 20 無法啟動：新裝的 jsdom 最新版要求 Node 22 以上 → 改為根目錄 devDependency `jsdom@^26`（支援 Node 18+）。本機以 Node v20.20.2 實跑 kiosk 47、backend 188 個 case 皆通過。
 - 並行下單在 CI 回 500（SQLite 寫入交易互搶鎖逾時）：建單交易改在 backend 內依序執行（`backend/src/lib/serialQueue.ts`，前提是單一行程部署），斷言未修改；新增 `serialQueue.ac003.test.ts`。
 
-已知但不在本階段處理：`npm ci` 回報 27 個相依套件弱點（npm audit；多為既有依賴），CI 尚未在 GitHub 上跑過（等 PR 觸發）。
+GitHub Actions（PR #3，Node 20，commit `a5667c0`，run 43758097646）：Lint & Typecheck ✅、Unit & Integration Tests ✅、Build ✅、E2E（API smoke＋WebSocket＋Playwright）✅；Deploy 依設計只在 main push 時執行，PR 上為 skipped。
+
+已知但不在本階段處理：`npm ci` 回報 27 個相依套件弱點（npm audit；多為既有依賴）。
 
 ### AC-001 完成內容
 
