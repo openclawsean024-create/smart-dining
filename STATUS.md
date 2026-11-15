@@ -1,6 +1,6 @@
 # STATUS — 餐飲自助點餐 KIOSK＋POS（smart-dining）
 
-- 狀態：🟡 **M1 第一階段開發中**（AC-001、011、002、003、004、005；其餘 AC 留待下一階段）
+- 狀態：🟢 **M1 第一階段完成，待 Sean 審查**（AC-001、011、002、003、004、005 皆有通過的測試；AC-006～AC-010、AC-012～AC-014 留待下一階段）
 - 分支：`feat/m1-a`（自 `chore/prd-rebuild` 開出；未合併、未部署）
 - 盤點基準：`main` @ `08b3e6d`（2026-09-06）
 
@@ -14,6 +14,25 @@
 | AC-003 | 訂單號／取餐號依台灣時區 | ✅ 完成（2026-11-16） | `backend/src/lib/taipeiTime.ac003.test.ts`（5 個 case）；`backend/src/modules/orders.taipei.ac003.test.ts`（4 個 case，fake timers） |
 | AC-004 | 後台訂單清單與 KDS | ✅ 完成（2026-11-16） | `backend/src/modules/admin.orders.ac004.test.ts`（13 個 case）；`kiosk-frontend/src/pages/admin/__tests__/KdsPage.ac004.test.tsx`（20 個 case，含 restaurant-kiosk 的 6 個 KDS 情境）；Playwright `e2e/kds-flow.ac004.spec.ts`（2 個 case） |
 | AC-005 | 菜單管理 | ✅ 完成（2026-11-16） | `backend/src/modules/menu.admin.ac005.test.ts`（29 個 case）；`kiosk-frontend/src/pages/admin/__tests__/MenuAdminPage.ac005.test.tsx`（12 個 case）；Playwright `e2e/menu-admin.ac005.spec.ts`（2 個 case） |
+
+### SOP 檢查結果（2026-11-16，本機 Node v26.13.1／npm 11.20.0，`feat/m1-a`）
+
+| 指令 | 結果 |
+|---|---|
+| `npm ci` | exit 0（673 個套件） |
+| `npm run build` | exit 0（contracts → backend → kiosk → mobile） |
+| `npm test` | exit 0：backend 9 檔 186 個 case、kiosk 4 檔 47 個 case 全數通過 |
+| `cd backend && npx tsc --noEmit` | exit 0 |
+| `npm run lint -w @smart-dining/kiosk` | exit 0 |
+| `npm run typecheck -w @smart-dining/mobile` | exit 0 |
+| `cd backend && npm run test:api` | exit 0，22 個請求皆符合預期狀態碼（`API SMOKE TEST PASSED`） |
+| `cd backend && npm run test:e2e` | exit 0（`E2E TEST PASSED`） |
+| `npm run test:e2e`（Playwright） | exit 0，4 個 case 通過 |
+| `cd backend && npx vitest run src/**/pricing*.test.ts src/**/orders*.test.ts`（GOAL AC-002） | exit 0，3 檔 63 個 case |
+| `git grep -n "password: '"` | 只出現在文件中描述此檢查的文字 |
+| `git grep -n -E "09[0-9]{2}-?[0-9]{3}-?[0-9]{3}"`（排除 0900-000-xxx） | 無結果 |
+
+已知但不在本階段處理：`npm ci` 回報 27 個相依套件弱點（npm audit；多為既有依賴），CI 尚未在 GitHub 上跑過（等 PR 觸發）。
 
 ### AC-001 完成內容
 
