@@ -22,18 +22,17 @@ backend 啟動、`db:*` 指令需要 `DATABASE_URL` 與 `JWT_SECRET`（`backend/
 | Build（全部） | `npm run build` | 可用，exit 0（contracts → backend `prisma generate && tsc` → kiosk `tsc --noEmit && vite build` → mobile 同） |
 | Unit（全部） | `npm test` | 可用，exit 0；實際只跑 backend vitest：1 檔 11 個 case。contracts 的 `test` 只印訊息；kiosk、mobile 沒有 `test` script |
 | Unit（backend） | `cd backend && npm test` | 可用，同上 |
-| Typecheck（backend） | `cd backend && npx tsc --noEmit` | 可用，exit 0（backend 沒有對應的 npm script） |
+| Typecheck（backend） | `cd backend && npx tsc --noEmit`（或 `npm run typecheck -w @smart-dining/backend`） | 可用，exit 0 |
 | Lint（KIOSK） | `npm run lint -w @smart-dining/kiosk` | 可用，exit 0；實際只是 `tsc --noEmit`，**ESLint 尚未配置** |
 | Typecheck（Mobile） | `npm run typecheck -w @smart-dining/mobile` | 可用，exit 0 |
 | DB 初始化 | `cd backend && npm run db:reset` | 可用（需第 2 節環境變數）；建立 SQLite 並寫入示範資料 |
 | 啟動全部服務 | `./scripts/start-all.sh`／`./scripts/stop-all.sh` | 腳本存在；需第 2 節環境變數。backend :4000、KIOSK :5173、Mobile :5174 |
 | 啟動 backend | `cd backend && npm run dev` | 可用（`tsx watch`） |
-| 端到端 API＋WebSocket 腳本 | `node scripts/e2e-test.mjs`（根目錄，需 backend 已啟動並已 `db:reset`） | 可用，實測輸出 `E2E TEST PASSED`；不是 npm script，也未進 CI |
+| 端到端 API＋WebSocket 腳本 | `cd backend && npm run test:e2e` | 可用（AC-001）：`scripts/with-test-server.mjs` 自動建立暫存 SQLite、seed、啟動 backend 後執行根目錄 `scripts/e2e-test.mjs`；斷言失敗即非 0 結束；已進 CI `e2e` job。也可用 `API_BASE=... node scripts/e2e-test.mjs` 打既有 backend |
 | WebSocket 腳本 | `cd backend && npm run test:ws -- <orderNo>` | 腳本存在；只印事件、不做斷言 |
-| API 冒煙腳本 | `cd backend && npm run test:api` | **結果不可信**：多個請求打錯路徑或 ID，回 404／500，但腳本仍 exit 0 |
-| backend `test:e2e` | `cd backend && npm run test:e2e` | **失敗**：指向不存在的 `backend/scripts/e2e.mjs` |
+| API 冒煙腳本 | `cd backend && npm run test:api` | 可用（AC-001）：每個請求比對狀態碼，404／500／連不上即 exit 1；同樣自帶測試 backend；已進 CI `e2e` job |
 | 前端單元／元件測試 | — | **尚未配置** |
-| API 整合測試（Fastify inject） | — | **尚未配置**（M1 AC-002～AC-012） |
+| API 整合測試（Fastify inject） | `cd backend && npm test` | 可用（AC-001 起）：vitest `globalSetup` 建立 SQLite 範本，每個測試 app 使用獨立複本；不需要 `.env` |
 | 瀏覽器 E2E（Playwright） | — | **尚未配置**（M1 AC-004～AC-006、AC-010） |
 | Format | — | **尚未配置** |
 | Coverage | — | **尚未配置** |
@@ -55,10 +54,11 @@ npm test
 
 `.github/workflows/ci.yml`（push／PR 到 `main`）：
 
-- `lint`：backend `tsc --noEmit`、kiosk `lint`、mobile `typecheck`，三步皆 `continue-on-error: true`（不擋錯；M1 AC-001 要移除）。
-- `test`：`prisma generate` 後跑 backend `vitest run`，並跑 contracts `npm test`。
+- `lint`：backend `tsc --noEmit`、kiosk `lint`、mobile `typecheck`，任一步失敗即失敗（AC-001 已移除 `continue-on-error`）。
+- `test`：`prisma generate` 後跑根目錄 `npm test`（全部 workspace）。
+- `e2e`：`npm run test:api`、`npm run test:e2e`（各自啟動一次性的測試 backend）。
 - `build`：`npm run build`，上傳 kiosk／mobile dist。
-- `deploy`：只在 `main` push 時執行 Vercel ×2＋Railway，缺 secrets 時不擋錯。PR 分支不會部署。
+- `deploy`：只在 `main` push 時執行 Vercel ×2＋Railway（需 `build`、`e2e` 通過），缺 secrets 時不擋錯。PR 分支不會部署。
 
 ## 6. M1 期間故意不做
 

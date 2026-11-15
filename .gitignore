@@ -75,3 +75,9 @@ shared-contracts/src/**/*.d.ts.map
 .jwt-secret.txt
 .vercel
 .env*
+
+# 測試用 SQLite 與 Playwright 產物
+backend/.test-db/
+test-results/
+playwright-report/
+.e2e-tmp/

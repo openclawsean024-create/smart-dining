@@ -61,7 +61,7 @@ curl -s http://localhost:4000/healthz
 - **Auth**:❌
 - **Request Body**(`LoginRequestBody`):
 ```json
-{ "phone": "0912345678" }
+{ "phone": "0900000001" }
 ```
 - **Response 200**(`LoginResponseBody`):
 ```json
@@ -73,7 +73,7 @@ curl -s http://localhost:4000/healthz
 ```bash
 curl -s -X POST http://localhost:4000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"phone":"0912345678"}'
+  -d '{"phone":"0900000001"}'
 ```
 
 ---
@@ -85,7 +85,7 @@ curl -s -X POST http://localhost:4000/api/auth/login \
 - **Auth**:❌
 - **Request Body**(`VerifyRequestBody`):
 ```json
-{ "phone": "0912345678", "code": "1234" }
+{ "phone": "0900000001", "code": "1234" }
 ```
 - **Response 200**(`VerifyResponseBody`):
 ```json
@@ -93,8 +93,8 @@ curl -s -X POST http://localhost:4000/api/auth/login \
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "member": {
     "id": "cm123...",
-    "phone": "0912345678",
-    "name": "王小明",
+    "phone": "0900000001",
+    "name": "測試會員甲",
     "points": 500,
     "tier": "GOLD",
     "createdAt": "2026-08-20T10:00:00.000Z"
@@ -107,7 +107,7 @@ curl -s -X POST http://localhost:4000/api/auth/login \
 ```bash
 curl -s -X POST http://localhost:4000/api/auth/verify \
   -H 'Content-Type: application/json' \
-  -d '{"phone":"0912345678","code":"1234"}'
+  -d '{"phone":"0900000001","code":"1234"}'
 ```
 
 ---
@@ -330,7 +330,7 @@ curl -s -X POST http://localhost:4000/api/admin/orders/SD-20260824-0002/advance
 ```json
 {
   "member": {
-    "id": "m1", "phone": "0912345678", "name": "王小明",
+    "id": "m1", "phone": "0900000001", "name": "測試會員甲",
     "points": 500, "tier": "GOLD",
     "createdAt": "2026-08-20T10:00:00.000Z"
   }
@@ -541,7 +541,7 @@ BASE=http://localhost:4000
 # 1. 登入 + 驗證
 TOKEN=$(curl -s -X POST $BASE/api/auth/verify \
   -H 'Content-Type: application/json' \
-  -d '{"phone":"0912345678","code":"1234"}' | jq -r .token)
+  -d '{"phone":"0900000001","code":"1234"}' | jq -r .token)
 
 # 2. 建立訂單
 curl -s -X POST $BASE/api/orders \

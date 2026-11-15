@@ -1,9 +1,28 @@
 # STATUS — 餐飲自助點餐 KIOSK＋POS（smart-dining）
 
-- 狀態：🟡 **PRD 重建完成，M1 尚未開始開發**（2026-11-16）
-- 本次變更：只重建文件（`PRD/SPEC.md`、`GOAL.md`、`AGENTS.md`、`SOP.md`、`STATUS.md`），未修改任何程式、設定或測試。
-- 分支：`chore/prd-rebuild`（Draft PR，未合併）
+- 狀態：🟡 **M1 第一階段開發中**（AC-001、011、002、003、004、005；其餘 AC 留待下一階段）
+- 分支：`feat/m1-a`（自 `chore/prd-rebuild` 開出；未合併、未部署）
 - 盤點基準：`main` @ `08b3e6d`（2026-09-06）
+
+## M1 第一階段進度（feat/m1-a）
+
+| AC | 內容 | 狀態 | 測試（名稱皆標 AC 編號） |
+|---|---|---|---|
+| AC-001 | 基線與 CI 擋錯 | ✅ 完成（2026-11-16） | `backend/src/test/__tests__/baseline.ac001.test.ts`（13 個 case）；`npm run test:api`、`npm run test:e2e` |
+| AC-011 | 員工角色與 API 授權 | ⏳ 未開始 | — |
+| AC-002 | 伺服器端計價、券碼以 DB 為準 | ⏳ 未開始 | — |
+| AC-003 | 訂單號／取餐號依台灣時區 | ⏳ 未開始 | — |
+| AC-004 | 後台訂單清單與 KDS | ⏳ 未開始 | — |
+| AC-005 | 菜單管理 | ⏳ 未開始 | — |
+
+### AC-001 完成內容
+
+- `backend` 的 `test:e2e` 改指到存在的腳本：`scripts/with-test-server.mjs`（建立暫存 SQLite、seed、在空閒埠啟動 backend）＋根目錄 `scripts/e2e-test.mjs`；斷言改用 `node:assert`，失敗即非 0 結束（原本用 `console.assert`，失敗也會印 PASSED）。
+- `backend/scripts/test-api.sh` 改寫：每個請求比對 HTTP 狀態碼，404／500／連不上皆以非 0 結束；`test:api` 同樣透過 `with-test-server.mjs` 自帶測試 backend。
+- CI：`lint`／`test`／`build` 移除 `continue-on-error` 與 `npm ci ... || npm install` fallback；新增 `e2e` job 跑 `test:api`、`test:e2e`。deploy 步驟未更動。
+- `fastify-plugin` 列入 `backend/package.json`；backend 新增 `typecheck` script。
+- 建立後端整合測試基礎：vitest `globalSetup` 以 `prisma db push` 建 SQLite 範本，`createTestApp()` 每個測試複製一份（`buildApp({ databaseUrl })`）。
+- 示範資料改為明顯假資料：手機 `0900000001`／`0900000002`（0900-000-xxx），姓名「測試會員甲／乙」；seed 抽成 `backend/src/seedData.ts` 供測試共用。
 
 ## Notion 商品資料庫對應
 
@@ -19,7 +38,7 @@
 | 上市前要補 | 合併四個 repo、補測試、電子發票與金流串接、硬體相容 | M1：合併、補測試、金流／發票／印表機 mock（GOAL AC-001～AC-014）；M2：真實串接與實機 |
 | 主要風險 | iCHEF 等競品成熟；電子發票與金流法規門檻 | SPEC §9 |
 
-## 驗證現況（2026-11-16 本機實測）
+## 驗證現況（PRD 重建時的基準，2026-11-16；最新結果見上方進度表與 SOP.md）
 
 | 指令 | 結果 |
 |---|---|

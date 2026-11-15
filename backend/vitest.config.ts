@@ -1,26 +1,23 @@
 import { defineConfig } from 'vitest/config';
-import { resolve } from 'node:path';
 
 /**
- * Minimal vitest config.
+ * Vitest 設定。
  *
- * Why we override defaults:
- * - The project's tsconfig has `rootDir: ".."` and `outDir: "./dist"`,
- *   which makes vitest's bundled TS resolver think source files compile
- *   into `dist/`. We point `resolve.alias` straight at the TS source so
- *   vitest reads the same files tsc reads, no stale build artifacts.
- * - We also drop the `.js` → `.ts` extension rewrite: tests can import
- *   either form and both land on `src/lib/verifyCode.ts`.
+ * - tsconfig 的 rootDir 為 ".."、outDir 為 "./dist"；以 alias 把 `.js` 匯入導回 TS 原始檔，
+ *   避免讀到過期的 build 產物。
+ * - globalSetup 建立測試用 SQLite 範本；setupFiles 在每個測試檔載入前設定環境變數。
  */
 export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/__tests__/**/*.test.ts', 'src/**/*.test.ts'],
+    globalSetup: ['./src/test/globalSetup.ts'],
+    setupFiles: ['./src/test/setupEnv.ts'],
+    testTimeout: 20_000,
+    hookTimeout: 30_000,
   },
   resolve: {
     alias: [
-      // Force every .js / .ts lookup under src/ back onto the TS source,
-      // bypassing any outDir inference.
       {
         find: /^(\.\.?\/.*)\.js$/,
         replacement: '$1',

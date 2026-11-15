@@ -16,9 +16,14 @@
     "clean": "rm -rf */dist */node_modules ./*.db",
     "build:kiosk": "npm run build -w @smart-dining/contracts && npm run build -w @smart-dining/kiosk",
     "build:mobile": "npm run build -w @smart-dining/contracts && npm run build -w @smart-dining/mobile",
-    "build:all": "npm run build --workspaces --if-present"
+    "build:all": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
   }
 }

@@ -20,7 +20,7 @@
 
 > Prisma schema / seed 摘要(本次 reset 後):
 > - 4 個分類、`10` 個 menu items、3 個 customizationGroups/item 級距
-> - 2 個會員:`0912345678` 王小明 (VIP/GOLD)、`0987654321` 林小華 (一般)
+> - 2 個會員:`0900000001` 測試會員甲 (VIP/GOLD)、`0900000002` 測試會員乙 (一般)
 > - 2 張 coupons:VIP 用 `VIP10`(10% 折扣)、一般用 `WELCOME`(NT$20)
 > - 1 張預建訂單 `SD-20260824-0001`(QUEUED, pickup=A001)
 
@@ -92,7 +92,7 @@ sleep 12
 Categories: 4
 Total items: 10
 Login: 1234 Development verification code
-Verify: 王小明 GOLD
+Verify: 測試會員甲 GOLD
 Coupons: 1
 Order created: SD-20260824-0002 pickup=A002
   subtotal: 149 discount: 14.9 total: 134.1
@@ -118,7 +118,7 @@ Pre-order final status: READY
 |---|--------|------|------|
 | C1 | `GET /api/menu` 回傳 4 個 category、≥10 個 item | ✅ | `Categories: 4 / Total items: 10` |
 | C2 | `POST /api/auth/login` 回傳 code `1234` 訊息 | ✅ | `Login: 1234 Development verification code` |
-| C3 | `POST /api/auth/verify` 回傳 member 且 VIP tier | ✅ | `Verify: 王小明 GOLD` |
+| C3 | `POST /api/auth/verify` 回傳 member 且 VIP tier | ✅ | `Verify: 測試會員甲 GOLD` |
 | C4 | VIP 會員 `/coupons` 含 `VIP10` | ✅ | `Coupons: 1`(VIP10 命中) |
 | C5 | VIP 訂單套 `VIP10` 折扣 > 0 | ✅ | `subtotal: 149 / discount: 14.9 / total: 134.1` |
 | C6 | 訂單正確生成 `orderNo`、`pickupNumber` | ✅ | `SD-20260824-0002 / A002` |

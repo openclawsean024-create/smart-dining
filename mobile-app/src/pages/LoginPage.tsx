@@ -68,7 +68,7 @@ export function LoginPage() {
               autoComplete="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="0912345678"
+              placeholder="0900000001"
               className="w-full rounded-2xl border-2 border-ink-100 bg-white px-4 py-4 text-base focus:border-brand-500 focus:outline-none"
             />
           </label>

@@ -12,14 +12,14 @@ describe('DevOTPProvider', () => {
   const provider = new DevOTPProvider();
 
   it('send() returns devHint=1234 for any phone', async () => {
-    const result = await provider.send('0912345678');
+    const result = await provider.send('0900000001');
     expect(result.devHint).toBe('1234');
   });
 
   it('verify() accepts 1234 and rejects other codes', async () => {
-    expect(await provider.verify('0912345678', '1234')).toBe(true);
-    expect(await provider.verify('0912345678', '0000')).toBe(false);
-    expect(await provider.verify('0912345678', '')).toBe(false);
+    expect(await provider.verify('0900000001', '1234')).toBe(true);
+    expect(await provider.verify('0900000001', '0000')).toBe(false);
+    expect(await provider.verify('0900000001', '')).toBe(false);
   });
 });
 
@@ -31,21 +31,21 @@ describe('MockOTPProvider', () => {
   });
 
   it('send() returns a 6-digit numeric devHint', async () => {
-    const result = await provider.send('0912345678');
+    const result = await provider.send('0900000001');
     expect(result.devHint).toMatch(/^\d{6}$/);
   });
 
   it('verify() accepts the code sent to the same phone exactly once', async () => {
-    const { devHint } = await provider.send('0912345678');
+    const { devHint } = await provider.send('0900000001');
     expect(devHint).toBeDefined();
-    expect(await provider.verify('0912345678', devHint!)).toBe(true);
+    expect(await provider.verify('0900000001', devHint!)).toBe(true);
     // Second attempt with the same code must fail (one-time consumption).
-    expect(await provider.verify('0912345678', devHint!)).toBe(false);
+    expect(await provider.verify('0900000001', devHint!)).toBe(false);
   });
 
   it('verify() rejects a different code', async () => {
-    await provider.send('0912345678');
-    expect(await provider.verify('0912345678', '000000')).toBe(false);
+    await provider.send('0900000001');
+    expect(await provider.verify('0900000001', '000000')).toBe(false);
   });
 });
 
