@@ -31,7 +31,7 @@
 ### 1.1 建立新 repo(若還沒有)
 
 ```bash
-cd "/Users/sean/Documents/Agent space/smart-dining"
+cd "<smart-dining repo 路徑>"
 gh repo create smart-dining --private --source=. --remote=origin --push
 # 或公開:
 # gh repo create smart-dining --public --source=. --remote=origin --push
@@ -40,7 +40,7 @@ gh repo create smart-dining --private --source=. --remote=origin --push
 ### 1.2(若 repo 已存在)手動連結
 
 ```bash
-cd "/Users/sean/Documents/Agent space/smart-dining"
+cd "<smart-dining repo 路徑>"
 git remote add origin https://github.com/YOUR_USERNAME/smart-dining.git
 git branch -M main
 git push -u origin main
@@ -76,7 +76,7 @@ git push -u origin main
 ### 2.4 切換 Prisma 到 Postgres 並部署
 
 ```bash
-cd "/Users/sean/Documents/Agent space/smart-dining"
+cd "<smart-dining repo 路徑>"
 ./scripts/prepare-prod.sh
 git add -A
 git commit -m "chore: switch prisma to postgresql for prod"

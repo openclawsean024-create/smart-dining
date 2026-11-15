@@ -123,7 +123,7 @@ smart-dining/
 ### 一鍵啟動(三個服務一起跑)
 
 ```bash
-cd "/Users/sean/Documents/Agent space/smart-dining"
+cd "<smart-dining repo 路徑>"
 ./scripts/start-all.sh
 ```
 
@@ -155,23 +155,23 @@ cd "/Users/sean/Documents/Agent space/smart-dining"
 
 ```bash
 # Terminal 1 — Backend
-cd "/Users/sean/Documents/Agent space/smart-dining/backend"
+cd "<smart-dining repo 路徑>/backend"
 npm run db:reset      # 首次需要:建立 DB + 種子(2 個會員 + 10 個菜單)
 npm run dev            # tsx watch src/server.ts → http://localhost:4000
 
 # Terminal 2 — KIOSK
-cd "/Users/sean/Documents/Agent space/smart-dining/kiosk-frontend"
+cd "<smart-dining repo 路徑>/kiosk-frontend"
 npm run dev            # Vite → http://localhost:5173
 
 # Terminal 3 — Mobile
-cd "/Users/sean/Documents/Agent space/smart-dining/mobile-app"
+cd "<smart-dining repo 路徑>/mobile-app"
 npm run dev            # Vite → http://localhost:5174
 ```
 
 ### 停止所有服務
 
 ```bash
-cd "/Users/sean/Documents/Agent space/smart-dining"
+cd "<smart-dining repo 路徑>"
 ./scripts/stop-all.sh
 ```
 

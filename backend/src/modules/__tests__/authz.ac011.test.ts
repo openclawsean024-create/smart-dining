@@ -4,6 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join, relative } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -108,7 +109,7 @@ describe('AC-011 員工登入與密碼雜湊', () => {
 
     const unknown = await app.inject({
       method: 'POST', url: '/api/staff/login',
-      payload: { username: 'no-such-staff', password: 'whatever-password' },
+      payload: { username: 'no-such-staff', password: randomUUID() },
     });
     expect(unknown.statusCode).toBe(401);
 
@@ -141,7 +142,7 @@ describe('AC-011 員工登入與密碼雜湊', () => {
     for (let i = 0; i < MAX_FAILURES; i++) {
       const res = await app.inject({
         method: 'POST', url: '/api/staff/login',
-        payload: { username: victim.username, password: 'wrong-password-' + i },
+        payload: { username: victim.username, password: randomUUID() + i },
       });
       expect(res.statusCode).toBe(401);
     }
@@ -412,7 +413,7 @@ describe('AC-011 repo 內沒有明碼預設密碼', () => {
   it('AC-011 原始碼沒有 password: \'...\' 這類寫死的密碼，也沒有 admin/admin', () => {
     const offenders: string[] = [];
     const patterns = [
-      /password\s*[:=]\s*['"`][^'"`$]+['"`]/i, // password: 'xxx'（不含樣板字串變數）
+      /password\s*[:=]\s*['"`][^'"`$]+['"`]/i, // 例如 password 後接冒號與引號包住的字面值（不含樣板字串變數）
       /passwordHash\s*[:=]\s*['"`]/i,
       /\badmin\s*\/\s*admin\b/i, // 完整單字；路徑如 pages/admin/AdminLayout 不算
       /\bpin\s*[:=]\s*['"`]\d{4,}['"`]/i,

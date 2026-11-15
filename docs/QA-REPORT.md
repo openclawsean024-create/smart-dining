@@ -13,7 +13,7 @@
 | Node.js | **v22.23.2** |
 | 作業系統 | **macOS** (Darwin 25.6.0, arm64 — Apple Silicon, kernel T8132) |
 | 主機 | `Mac-mini-2.local` |
-| 工作目錄 | `/Users/sean/Documents/Agent space/smart-dining` |
+| 工作目錄 | `<smart-dining repo 路徑>` |
 | 測試時間 | 2026-08-24 17:48–17:52 (UTC+8) |
 | DB | SQLite(`backend/data/dev.db`),已 `db:reset` 重灌 + seed |
 | 預設驗證碼 | `1234`(`shared-contracts` + `backend/src/lib/verifyCode.ts`) |
