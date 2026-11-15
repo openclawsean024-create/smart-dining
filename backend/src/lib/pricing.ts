@@ -14,7 +14,8 @@ export type PricingErrorCode =
   | 'CART_001' // 數量必須為正整數
   | 'PRODUCT_001' // 品項價格錯誤（負價、非數字）
   | 'ITEM_NOT_FOUND' // 品項不存在
-  | 'ITEM_UNAVAILABLE' // 品項已下架
+  | 'ITEM_UNAVAILABLE' // 品項已下架或已刪除
+  | 'ITEM_OUT_OF_STOCK' // 庫存為 0 或不足（AC-005）
   | 'OPTION_INVALID' // 選項或群組不屬於該品項、重複、單選群組選了多個
   | 'OPTION_UNAVAILABLE' // 選項已停用
   | 'OPTION_REQUIRED' // 缺少必選群組
@@ -52,6 +53,10 @@ export interface PricingMenuItem {
   name: string;
   basePrice: number;
   available: boolean;
+  /** 軟刪除時間；有值視同下架 */
+  deletedAt?: Date | null;
+  /** 庫存；null／undefined＝不追蹤 */
+  stock?: number | null;
   customizationGroups: PricingGroup[];
 }
 
@@ -91,8 +96,11 @@ function assertValidQuantity(quantity: unknown): asserts quantity is number {
  */
 export function priceLine(item: PricingMenuItem, input: OrderLineInput): PricedLine {
   assertValidQuantity(input.quantity);
-  if (!item.available) {
+  if (!item.available || item.deletedAt) {
     throw new PricingError('ITEM_UNAVAILABLE', `menu item ${item.id} is not available`);
+  }
+  if (item.stock != null && item.stock <= 0) {
+    throw new PricingError('ITEM_OUT_OF_STOCK', `menu item ${item.id} is out of stock`);
   }
   if (!Number.isFinite(item.basePrice) || item.basePrice < 0) {
     throw new PricingError('PRODUCT_001', `menu item ${item.id} has an invalid price`);
@@ -170,6 +178,15 @@ export function priceCart(inputs: OrderLineInput[], menu: ReadonlyMap<string, Pr
     }
     return priceLine(item, input);
   });
+  // 同一品項分成多行（不同客製化）時，合計數量也不能超過庫存
+  const qtyByItem = new Map<string, number>();
+  for (const l of lines) qtyByItem.set(l.menuItemId, (qtyByItem.get(l.menuItemId) ?? 0) + l.quantity);
+  for (const [id, qty] of qtyByItem) {
+    const stock = menu.get(id)?.stock;
+    if (stock != null && qty > stock) {
+      throw new PricingError('ITEM_OUT_OF_STOCK', `menu item ${id} has only ${stock} left`);
+    }
+  }
   return { lines, subtotal: lines.reduce((sum, l) => sum + l.subtotal, 0) };
 }
 

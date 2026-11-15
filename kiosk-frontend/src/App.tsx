@@ -7,6 +7,7 @@
  *   /complete/:orderNo → CompletePage
  *   /admin             → 後台(需員工登入,AC-011);預設導向 /admin/kds
  *   /admin/kds         → KdsPage 廚房顯示系統(AC-004)
+ *   /admin/menu        → MenuAdminPage 菜單管理(AC-005;只有店長)
  *   *                  → NotFoundPage
  */
 import { useEffect } from 'react';
@@ -17,6 +18,7 @@ import { CompletePage } from './pages/CompletePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminLayout } from './pages/admin/AdminLayout';
 import { KdsPage } from './pages/admin/KdsPage';
+import { MenuAdminPage } from './pages/admin/MenuAdminPage';
 import { PickupModal } from './components/PickupModal';
 import { RequireStaff } from './components/staff/RequireStaff';
 import { useUIStore } from './store/uiStore';
@@ -59,6 +61,14 @@ export function AppRoutes() {
         >
           <Route index element={<Navigate to="/admin/kds" replace />} />
           <Route path="kds" element={<KdsPage />} />
+          <Route
+            path="menu"
+            element={
+              <RequireStaff roles={['MANAGER']}>
+                <MenuAdminPage />
+              </RequireStaff>
+            }
+          />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

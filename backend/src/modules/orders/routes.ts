@@ -120,6 +120,17 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
       const createOrder = () => app.prisma.$transaction(async (tx) => {
         const orderNo = await generateOrderNo(tx, now);
         const pickupNumber = await nextPickupNumber(tx, now);
+        // 扣庫存（只針對有追蹤庫存的品項）；以「庫存足夠」為條件更新，並行下單不會扣成負數（AC-005）
+        const qtyByItem = new Map<string, number>();
+        for (const l of priced.lines) qtyByItem.set(l.menuItemId, (qtyByItem.get(l.menuItemId) ?? 0) + l.quantity);
+        for (const [menuItemId, qty] of qtyByItem) {
+          if (menu.get(menuItemId)?.stock == null) continue;
+          const updated = await tx.menuItem.updateMany({
+            where: { id: menuItemId, stock: { gte: qty } },
+            data: { stock: { decrement: qty } },
+          });
+          if (updated.count !== 1) throw new PricingError('ITEM_OUT_OF_STOCK', `menu item ${menuItemId} is out of stock`);
+        }
         if (coupon) {
           // 以 usedAt: null 為條件更新，避免同一張券被並行的兩張訂單重複使用
           const used = await tx.coupon.updateMany({ where: { id: coupon.id, usedAt: null }, data: { usedAt: now } });

@@ -10,6 +10,7 @@ import menuRoutes from './modules/menu/routes.js';
 import orderRoutes from './modules/orders/routes.js';
 import memberRoutes from './modules/members/routes.js';
 import adminRoutes from './modules/admin/routes.js';
+import adminMenuRoutes from './modules/admin/menuRoutes.js';
 
 export interface BuildAppOptions {
   /** 關閉 logger（測試用）。預設開啟。 */
@@ -30,6 +31,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(orderRoutes);
   await app.register(memberRoutes);
   await app.register(adminRoutes);
+  await app.register(adminMenuRoutes);
   app.get('/healthz', async () => ({ ok: true }));
   return app;
 }

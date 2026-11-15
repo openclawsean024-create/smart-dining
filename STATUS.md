@@ -13,7 +13,7 @@
 | AC-002 | 伺服器端計價、券碼以 DB 為準 | ✅ 完成（2026-11-16） | `backend/src/lib/pricing.ac002.test.ts`（35 個 case）；`backend/src/modules/orders.pricing.ac002.test.ts`（24 個 case）；`kiosk-frontend/src/pages/__tests__/CheckoutPage.ac002.test.tsx`（7 個 case） |
 | AC-003 | 訂單號／取餐號依台灣時區 | ✅ 完成（2026-11-16） | `backend/src/lib/taipeiTime.ac003.test.ts`（5 個 case）；`backend/src/modules/orders.taipei.ac003.test.ts`（4 個 case，fake timers） |
 | AC-004 | 後台訂單清單與 KDS | ✅ 完成（2026-11-16） | `backend/src/modules/admin.orders.ac004.test.ts`（13 個 case）；`kiosk-frontend/src/pages/admin/__tests__/KdsPage.ac004.test.tsx`（20 個 case，含 restaurant-kiosk 的 6 個 KDS 情境）；Playwright `e2e/kds-flow.ac004.spec.ts`（2 個 case） |
-| AC-005 | 菜單管理 | ⏳ 未開始 | — |
+| AC-005 | 菜單管理 | ✅ 完成（2026-11-16） | `backend/src/modules/menu.admin.ac005.test.ts`（29 個 case）；`kiosk-frontend/src/pages/admin/__tests__/MenuAdminPage.ac005.test.tsx`（12 個 case）；Playwright `e2e/menu-admin.ac005.spec.ts`（2 個 case） |
 
 ### AC-001 完成內容
 
@@ -68,6 +68,17 @@
 - KIOSK 新增 `/admin/kds`（改寫自 restaurant-kiosk `KdsPage.tsx`）：取餐號大字、品項與客製化、等待時間（以伺服器時間計算，超過 10 分鐘警示色）、一鍵推進；內場／店長可推進製作階段，收銀／店長可在「可取餐」按完成取餐（與後端角色限制一致）；`/kds` 通知即時更新＋每 10 秒輪詢備援；失敗時顯示錯誤，不再顯示假資料。舊的 `AdminPanel`（含 DEMO 假訂單與失敗時樂觀更新）移除，`/admin` 導向 KDS。
 - restaurant-kiosk `web/tests/e2e.test.tsx` 的 6 個 KDS 情境（nav、空狀態、有單不顯示空狀態、顯示單號、依等待時間排序、推進按鈕）改寫為元件測試，全數保留。
 - Playwright（設定模式參考 pos-multitrade）：`npm run test:e2e` 自動啟動 backend（暫存 SQLite＋seed，埠 4100）、KIOSK（5273）、手機（5274），員工密碼與 JWT secret 每次隨機產生。主流程「KIOSK 下單 → KDS 推進到 READY → 手機追蹤頁顯示可取餐」：手機頁不重新整理，靠 Socket 事件由 10% 更新到 100%。已加入 CI `e2e` job。Vite 預先打包依賴，避免冷啟動時頁面重新載入造成不穩定（本機連跑 8 次與清快取冷跑皆通過）。
+
+### AC-005 完成內容
+
+- Prisma `MenuItem` 新增 `sku`、`cost`、`stock`（null＝不追蹤）、`reorderLevel`、`deletedAt`（軟刪除）；兩份 schema 同步修改。
+- 店長專用 API：`GET／POST /api/admin/menu/items`、`PATCH／DELETE /api/admin/menu/items/:id`（新增、編輯、上下架、軟刪除）；zod 驗證（售價／成本不可負、庫存為非負整數、分類必須存在、未知欄位拒絕），SKU 在未刪除品項間不可重複（409）。其他角色 403、無 token 401。
+- `GET /api/menu` 只回傳上架、未刪除、庫存不為 0 的品項，且不輸出成本、庫存、SKU。
+- 下單：下架或已刪除 → 400 `ITEM_UNAVAILABLE`；庫存為 0 或不足（同品項多行合計）→ 400 `ITEM_OUT_OF_STOCK`。有追蹤庫存的品項下單時以條件更新扣庫存，並行下單不會扣成負數；賣完即從 KIOSK 菜單消失。
+- KIOSK 後台 `/admin/menu`（只有店長；導覽列只對店長顯示）：改寫自 restaurant-kiosk `AdminItemsPage`（新增、上下架）與 pos-system `InventoryView`（編輯、刪除確認、成本、毛利率、庫存、低庫存警示與「只看低庫存」篩選、名稱／SKU 搜尋）；不搬 pos-system 的 localStorage 與示範資料。
+- 順帶修正：KIOSK 側欄「飲品」對應的分類 ID 寫成 `cat-drinks`（seed 為 `cat-drink`），導致飲品分類顯示全部品項。
+- seed 的示範成本為售價的 40%，庫存預設不追蹤。
+- 尚未做（不在本階段）：分類與客製化群組的管理（FR-064，P1）。
 
 ## Notion 商品資料庫對應
 
@@ -133,9 +144,9 @@
 | FR-060 | 訂單推進＋廣播 | P0 | 已實作（AC-011：需員工 JWT） | SD |
 | FR-061 | 後台訂單清單 | P0 | 已實作（AC-004） | SD |
 | FR-062 | KDS | P0 | 已實作（AC-004） | SD |
-| FR-063 | 菜單管理 | P0 | 部分 | RK、PS |
+| FR-063 | 菜單管理 | P0 | 已實作（AC-005） | SD |
 | FR-064 | 分類與客製化群組管理 | P1 | 未實作 | — |
-| FR-065 | 成本／庫存／低庫存 | P1 | 部分 | PS |
+| FR-065 | 成本／庫存／低庫存 | P1 | 已實作（AC-005） | SD |
 | FR-066 | 營收報表 | P0 | 部分 | PS、PM |
 | FR-067 | 員工角色與登入 | P0 | 已實作（AC-011：bcrypt＋角色 JWT；員工帳號管理 UI 未做） | SD |
 | FR-068 | 打卡 | P2 | 部分 | PS |

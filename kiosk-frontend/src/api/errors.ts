@@ -9,6 +9,7 @@ const ORDER_ERROR_MESSAGES: Record<string, string> = {
   PRODUCT_001: '有餐點的價格資料異常,請洽店員',
   ITEM_NOT_FOUND: '有餐點已下架,請從購物車移除後再結帳',
   ITEM_UNAVAILABLE: '有餐點已下架或售完,請從購物車移除後再結帳',
+  ITEM_OUT_OF_STOCK: '有餐點庫存不足或已售完,請調整數量或移除後再結帳',
   OPTION_INVALID: '有餐點的客製化選項已變更,請移除後重新選擇',
   OPTION_UNAVAILABLE: '有客製化選項目前無法提供,請移除後重新選擇',
   OPTION_REQUIRED: '有餐點尚未選擇必選項目,請移除後重新選擇',

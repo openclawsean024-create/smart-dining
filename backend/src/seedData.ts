@@ -266,6 +266,8 @@ export async function seedDatabase(prisma: PrismaClient, opts: SeedOptions = {})
         imageUrl: item.imageUrl,
         available: true,
         tags: item.tags,
+        // 示範用成本（售價的 40%）；庫存預設不追蹤（null），由店長在後台設定（AC-005）
+        cost: Math.round(item.basePrice * 0.4),
         customizationGroups: {
           create: item.groups.map((g, gi) => ({
             id: demoGroupId(item.id, gi),

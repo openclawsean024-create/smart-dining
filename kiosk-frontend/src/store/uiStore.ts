@@ -27,7 +27,7 @@ export const SIDEBAR_CATEGORIES: SidebarCategory[] = [
   { id: 'popular', icon: '🌟', name: '人氣精選' },
   { id: 'main', icon: '🍚', name: '主餐', backendCategoryId: 'cat-main' },
   { id: 'side', icon: '🍟', name: '配餐', backendCategoryId: 'cat-side' },
-  { id: 'drinks', icon: '🥤', name: '飲品', backendCategoryId: 'cat-drinks' },
+  { id: 'drinks', icon: '🥤', name: '飲品', backendCategoryId: 'cat-drink' },
   { id: 'dessert', icon: '🍰', name: '甜點', backendCategoryId: 'cat-dessert' },
   { id: 'member', icon: '👤', name: '會員專區' },
 ];

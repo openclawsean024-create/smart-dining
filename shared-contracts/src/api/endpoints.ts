@@ -8,7 +8,7 @@
  * 實際 HTTP 介面在 backend 端實作。
  */
 
-import type { Category, MenuItem, CustomizationGroup } from '../types/menu.js';
+import type { AdminMenuItem, Category, MenuItem, CustomizationGroup } from '../types/menu.js';
 import type { Cart, Order } from '../types/order.js';
 import type { Member, Coupon } from '../types/member.js';
 import type { Staff } from '../types/staff.js';
@@ -59,8 +59,20 @@ export interface StaffMeResponseBody {
 // Menu
 // ============================================================
 
+/** KIOSK 菜單：只含上架、未刪除、庫存不為 0 的品項（AC-005）。 */
 export interface MenuResponseBody {
   categories: Array<Category & { items: Array<MenuItem & { customizationGroups: CustomizationGroup[] }> }>;
+}
+
+/** 後台菜單管理（AC-005；店長）。 */
+export interface AdminMenuResponseBody {
+  categories: Category[];
+  /** 不含已刪除的品項 */
+  items: AdminMenuItem[];
+}
+
+export interface AdminMenuItemResponseBody {
+  item: AdminMenuItem;
 }
 
 // ============================================================
@@ -165,6 +177,8 @@ export const API_PATHS = {
   },
   admin: {
     orders: '/api/admin/orders',
+    menuItems: '/api/admin/menu/items',
+    menuItem: (id: string) => `/api/admin/menu/items/${id}`,
     advanceOrder: (orderNo: string) => `/api/admin/orders/${orderNo}/advance`,
   },
   members: {
