@@ -14,13 +14,15 @@ backend 啟動、`db:*` 指令需要 `DATABASE_URL` 與 `JWT_SECRET`（`backend/
 
 - repo 只有 `backend/.env.production.example`（正式環境範本），**本機開發用的 `.env` 範本尚未配置**。
 - 本機請自行建立 `backend/.env`（已被 `.gitignore` 排除，不可提交），內容只放本機用值，例如 `DATABASE_URL="file:./data/dev.db"`，`JWT_SECRET` 用 `openssl rand -hex 32` 產生。
+- 示範員工密碼（AC-011）：repo 內沒有預設密碼。`npm run db:seed`／`db:reset` 會建立 `manager01`（店長）、`cashier01`（收銀）、`kitchen01`（內場）；密碼取自環境變數 `SEED_STAFF_PASSWORD`（至少 8 碼，可放在本機 `backend/.env`），未設定時每次隨機產生並只在終端機顯示一次。資料庫只存 bcrypt 雜湊。
+- `npm test`、`npm run test:api`、`npm run test:e2e` 不需要 `.env`：JWT secret 與員工密碼都在執行時隨機產生。
 
 ## 3. 驗證指令
 
 | 類型 | 指令 | 狀態（2026-11-16 實測） |
 |---|---|---|
 | Build（全部） | `npm run build` | 可用，exit 0（contracts → backend `prisma generate && tsc` → kiosk `tsc --noEmit && vite build` → mobile 同） |
-| Unit（全部） | `npm test` | 可用，exit 0；實際只跑 backend vitest：1 檔 11 個 case。contracts 的 `test` 只印訊息；kiosk、mobile 沒有 `test` script |
+| Unit／整合（全部） | `npm test` | 可用，exit 0；跑 backend vitest（單元＋Fastify inject 整合）與 kiosk vitest（jsdom 元件測試）。contracts 的 `test` 只印訊息；mobile 沒有 `test` script |
 | Unit（backend） | `cd backend && npm test` | 可用，同上 |
 | Typecheck（backend） | `cd backend && npx tsc --noEmit`（或 `npm run typecheck -w @smart-dining/backend`） | 可用，exit 0 |
 | Lint（KIOSK） | `npm run lint -w @smart-dining/kiosk` | 可用，exit 0；實際只是 `tsc --noEmit`，**ESLint 尚未配置** |
@@ -31,7 +33,7 @@ backend 啟動、`db:*` 指令需要 `DATABASE_URL` 與 `JWT_SECRET`（`backend/
 | 端到端 API＋WebSocket 腳本 | `cd backend && npm run test:e2e` | 可用（AC-001）：`scripts/with-test-server.mjs` 自動建立暫存 SQLite、seed、啟動 backend 後執行根目錄 `scripts/e2e-test.mjs`；斷言失敗即非 0 結束；已進 CI `e2e` job。也可用 `API_BASE=... node scripts/e2e-test.mjs` 打既有 backend |
 | WebSocket 腳本 | `cd backend && npm run test:ws -- <orderNo>` | 腳本存在；只印事件、不做斷言 |
 | API 冒煙腳本 | `cd backend && npm run test:api` | 可用（AC-001）：每個請求比對狀態碼，404／500／連不上即 exit 1；同樣自帶測試 backend；已進 CI `e2e` job |
-| 前端單元／元件測試 | — | **尚未配置** |
+| 前端元件測試（KIOSK） | `npm test -w @smart-dining/kiosk` | 可用（AC-011 起）：vitest＋jsdom＋Testing Library。mobile-app **尚未配置** |
 | API 整合測試（Fastify inject） | `cd backend && npm test` | 可用（AC-001 起）：vitest `globalSetup` 建立 SQLite 範本，每個測試 app 使用獨立複本；不需要 `.env` |
 | 瀏覽器 E2E（Playwright） | — | **尚未配置**（M1 AC-004～AC-006、AC-010） |
 | Format | — | **尚未配置** |
@@ -54,7 +56,7 @@ npm test
 
 `.github/workflows/ci.yml`（push／PR 到 `main`）：
 
-- `lint`：backend `tsc --noEmit`、kiosk `lint`、mobile `typecheck`，任一步失敗即失敗（AC-001 已移除 `continue-on-error`）。
+- `lint`：backend `tsc --noEmit`、（先 build shared-contracts）kiosk `lint`、mobile `typecheck`，任一步失敗即失敗（AC-001 已移除 `continue-on-error`）。
 - `test`：`prisma generate` 後跑根目錄 `npm test`（全部 workspace）。
 - `e2e`：`npm run test:api`、`npm run test:e2e`（各自啟動一次性的測試 backend）。
 - `build`：`npm run build`，上傳 kiosk／mobile dist。

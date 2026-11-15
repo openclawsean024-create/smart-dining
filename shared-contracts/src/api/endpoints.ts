@@ -11,6 +11,7 @@
 import type { Category, MenuItem, CustomizationGroup } from '../types/menu.js';
 import type { Cart, Order } from '../types/order.js';
 import type { Member, Coupon } from '../types/member.js';
+import type { Staff } from '../types/staff.js';
 
 // ============================================================
 // Auth
@@ -21,7 +22,8 @@ export interface LoginRequestBody {
 }
 
 export interface LoginResponseBody {
-  code: string;
+  /** 只有 dev／mock OTP provider 會回傳；正式簡訊 provider 不回傳。 */
+  code?: string;
   message: string;
 }
 
@@ -33,6 +35,24 @@ export interface VerifyRequestBody {
 export interface VerifyResponseBody {
   token: string;
   member: Member;
+}
+
+// ============================================================
+// Staff（AC-011）— 員工登入後取得員工 JWT，後台／KDS／管理 API 皆需此 token
+// ============================================================
+
+export interface StaffLoginRequestBody {
+  username: string;
+  password: string;
+}
+
+export interface StaffLoginResponseBody {
+  token: string;
+  staff: Staff;
+}
+
+export interface StaffMeResponseBody {
+  staff: Staff;
 }
 
 // ============================================================
@@ -67,7 +87,8 @@ export interface GetMemberOrdersResponseBody {
 
 export interface UpdateOrderStatusRequestBody {
   status: Order['status'];
-  changedBy: string;
+  /** @deprecated 後端一律以員工 JWT 的身分記錄，忽略此欄位。 */
+  changedBy?: string;
 }
 
 export interface UpdateOrderStatusResponseBody {
@@ -117,6 +138,10 @@ export const API_PATHS = {
   auth: {
     login: '/api/auth/login',
     verify: '/api/auth/verify',
+  },
+  staff: {
+    login: '/api/staff/login',
+    me: '/api/staff/me',
   },
   menu: '/api/menu',
   orders: {

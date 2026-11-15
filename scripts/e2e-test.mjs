@@ -3,7 +3,9 @@
 // 建議用法（自動啟動一次性的測試 backend）：
 //   cd backend && npm run test:e2e
 // 或對既有 backend：
-//   API_BASE=http://localhost:4000 node scripts/e2e-test.mjs
+//   API_BASE=http://localhost:4000 E2E_STAFF_PASSWORD=<seed 時的員工密碼> node scripts/e2e-test.mjs
+//
+// 員工帳號：E2E_STAFF_USERNAME（預設 kitchen01）／E2E_STAFF_PASSWORD（必填，腳本內不寫死任何密碼）。
 //
 // 任何一個斷言失敗即以非 0 結束（AC-001）。
 import assert from 'node:assert/strict';
@@ -11,6 +13,9 @@ import assert from 'node:assert/strict';
 const BASE = process.env.API_BASE ?? 'http://localhost:4000';
 const VIP_PHONE = process.env.SD_DEMO_PHONE ?? '0900000001'; // seed 的示範會員（明顯假號）
 const GUEST_PHONE = process.env.SD_DEMO_GUEST_PHONE ?? '0900000002';
+const STAFF_USERNAME = process.env.E2E_STAFF_USERNAME ?? 'kitchen01';
+const STAFF_PASSWORD = process.env.E2E_STAFF_PASSWORD;
+assert.ok(STAFF_PASSWORD, '請以環境變數 E2E_STAFF_PASSWORD 提供員工密碼（npm run test:e2e 會自動產生）');
 
 async function api(method, path, { body, token, expect = 200 } = {}) {
   const res = await fetch(BASE + path, {
@@ -73,7 +78,11 @@ console.log('  subtotal:', order.subtotal, 'discount:', order.discount, 'total:'
 assert.ok(order.discount > 0, 'VIP10 應該有折扣');
 assert.equal(order.totalAmount, order.subtotal - order.discount);
 
-// Step 5: WebSocket 訂閱 + 推進狀態
+// Step 5: 員工登入（內場）→ WebSocket 訂閱 + 推進狀態
+const staff = await api('POST', '/api/staff/login', { body: { username: STAFF_USERNAME, password: STAFF_PASSWORD } });
+console.log('Staff login:', staff.staff.username, staff.staff.role);
+await api('POST', `/api/admin/orders/${order.orderNo}/advance`, { expect: 401 });
+await api('POST', `/api/admin/orders/${order.orderNo}/advance`, { expect: 403, token: vip.token });
 const { io } = await import('socket.io-client');
 const socket = io(BASE + '/tracking', { transports: ['websocket'] });
 await new Promise((resolve, reject) => {
@@ -90,7 +99,7 @@ await new Promise((resolve) => socket.emit('track:order', { orderNo: order.order
 
 // 推進 QUEUED → PREPARING → COOKING → PLATING → READY
 for (let i = 0; i < 4; i++) {
-  const data = await api('POST', `/api/admin/orders/${order.orderNo}/advance`);
+  const data = await api('POST', `/api/admin/orders/${order.orderNo}/advance`, { token: staff.token });
   console.log('Advanced to:', data.order.status);
 }
 await new Promise((r) => setTimeout(r, 500));

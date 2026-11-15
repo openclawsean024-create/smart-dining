@@ -9,7 +9,7 @@
 | AC | 內容 | 狀態 | 測試（名稱皆標 AC 編號） |
 |---|---|---|---|
 | AC-001 | 基線與 CI 擋錯 | ✅ 完成（2026-11-16） | `backend/src/test/__tests__/baseline.ac001.test.ts`（13 個 case）；`npm run test:api`、`npm run test:e2e` |
-| AC-011 | 員工角色與 API 授權 | ⏳ 未開始 | — |
+| AC-011 | 員工角色與 API 授權 | ✅ 完成（2026-11-16） | `backend/src/modules/__tests__/authz.ac011.test.ts`（59 個 case）；`kiosk-frontend/src/components/staff/__tests__/RequireStaff.ac011.test.tsx`（7 個 case） |
 | AC-002 | 伺服器端計價、券碼以 DB 為準 | ⏳ 未開始 | — |
 | AC-003 | 訂單號／取餐號依台灣時區 | ⏳ 未開始 | — |
 | AC-004 | 後台訂單清單與 KDS | ⏳ 未開始 | — |
@@ -23,6 +23,25 @@
 - `fastify-plugin` 列入 `backend/package.json`；backend 新增 `typecheck` script。
 - 建立後端整合測試基礎：vitest `globalSetup` 以 `prisma db push` 建 SQLite 範本，`createTestApp()` 每個測試複製一份（`buildApp({ databaseUrl })`）。
 - 示範資料改為明顯假資料：手機 `0900000001`／`0900000002`（0900-000-xxx），姓名「測試會員甲／乙」；seed 抽成 `backend/src/seedData.ts` 供測試共用。
+
+### AC-011 完成內容
+
+- 新增 `Staff` 模型（`MANAGER` 店長／`CASHIER` 收銀／`KITCHEN` 內場），密碼只存 bcrypt 雜湊；`POST /api/staff/login`、`GET /api/staff/me`。連續失敗 5 次暫時鎖定（429）；超過 bcrypt 72 bytes 上限的密碼直接拒絕。
+- JWT 分會員／員工兩種（`kind`）；無 token 401、身分或角色不符 403。員工 token 每次請求都會查帳號是否仍啟用，角色以資料庫為準。
+- 權限表：
+
+  | API | 允許 |
+  |---|---|
+  | `GET /api/members/:id`、`/coupons`、`GET /api/orders/member/:memberId` | 本人會員、店長 |
+  | `POST /api/members/:id/points/add` | 只有店長（會員本人也不行）；寫 PointsTransaction，點數不可為負 |
+  | `POST /api/admin/orders/:orderNo/advance` | 店長、內場 |
+  | `PATCH /api/orders/:orderNo/status` | 店長：全部；內場：QUEUED～READY；收銀：COMPLETED／CANCELLED |
+  | `POST /api/orders` | 公開；但 `memberId` 只認會員 JWT（body 自填他人 ID → 401／403），綁定會員的優惠券只能本人使用 |
+  | `GET /api/orders/:orderNo`、`GET /api/menu`、Socket `/tracking` | 公開（顧客追蹤用） |
+
+- 沒有任何明碼預設密碼：seed 的示範員工（`manager01`／`cashier01`／`kitchen01`）密碼來自環境變數 `SEED_STAFF_PASSWORD`，未設定時每次隨機產生並只在終端機顯示一次；測試與腳本的密碼皆執行時隨機產生。測試會掃描原始碼確認沒有 `password: '...'`、`admin/admin`。
+- KIOSK 前端：`/admin` 需員工登入（`RequireStaff`＋`StaffLoginForm`，token 放 sessionStorage），API client 區分會員／員工 token；下單改帶會員 JWT。
+- 尚未處理（不在本階段）：`DevOTPProvider` 的固定示範驗證碼仍是 dev 預設（真實簡訊 OTP 為 FR-085／M2）；正式環境上線前必須換掉，否則會員 JWT 可被任意取得。
 
 ## Notion 商品資料庫對應
 

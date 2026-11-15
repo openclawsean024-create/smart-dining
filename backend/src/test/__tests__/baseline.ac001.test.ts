@@ -6,6 +6,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -75,9 +76,13 @@ describe('AC-001 test-api.sh 擋錯', () => {
 
   it('AC-001 對正常且已 seed 的 backend，test-api.sh 以 0 結束', async () => {
     testApp = await createTestApp();
-    await seedDatabase(testApp.app.prisma);
+    const staffPassword = randomUUID(); // 每次執行隨機產生，只存在這個測試的資料庫
+    await seedDatabase(testApp.app.prisma, { staffPassword });
     const base = await listen(testApp.app);
-    const { code, output } = await runScript('bash', ['scripts/test-api.sh'], { API_BASE: base });
+    const { code, output } = await runScript('bash', ['scripts/test-api.sh'], {
+      API_BASE: base,
+      E2E_STAFF_PASSWORD: staffPassword,
+    });
     expect(output).not.toContain('FAIL');
     expect(code).toBe(0);
   });

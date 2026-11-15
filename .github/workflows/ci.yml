@@ -38,6 +38,8 @@ jobs:
       - name: Backend tsc --noEmit
         working-directory: backend
         run: npx tsc --noEmit
+      - name: Build shared contracts (frontends typecheck against its dist types)
+        run: npm run build -w @smart-dining/contracts
       - name: Kiosk lint
         working-directory: kiosk-frontend
         run: npm run lint

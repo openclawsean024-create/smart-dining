@@ -6,11 +6,19 @@
  * - 不放任何明碼預設密碼；員工密碼由呼叫端傳入後以 bcrypt 雜湊（見 seed.ts）。
  */
 import type { PrismaClient } from '@prisma/client';
+import { hashPassword } from './lib/password.js';
 
 export const DEMO_MEMBERS = {
   vip: { id: 'member-vip', phone: '0900000001', name: '測試會員甲', points: 500, tier: 'GOLD' },
   guest: { id: 'member-guest', phone: '0900000002', name: '測試會員乙', points: 50, tier: 'BRONZE' },
 } as const;
+
+/** 示範員工帳號（AC-011）。這裡沒有密碼：密碼由 seed 執行時傳入或隨機產生，只存 bcrypt 雜湊。 */
+export const DEMO_STAFF = [
+  { username: 'manager01', name: '測試店長', role: 'MANAGER' },
+  { username: 'cashier01', name: '測試收銀', role: 'CASHIER' },
+  { username: 'kitchen01', name: '測試內場', role: 'KITCHEN' },
+] as const;
 
 export const DEMO_COUPONS = {
   vip10: { code: 'VIP10', type: 'PERCENTAGE', value: 10, memberId: DEMO_MEMBERS.vip.id },
@@ -209,6 +217,11 @@ export const demoChoiceId = (itemId: string, groupIndex: number, choiceIndex: nu
 export interface SeedOptions {
   /** 是否建立一筆示範用的排隊中訂單（預設建立）。 */
   withDemoOrder?: boolean;
+  /**
+   * 示範員工的密碼（至少 8 碼）。有提供才建立 DEMO_STAFF；只寫入 bcrypt 雜湊。
+   * repo 內沒有任何預設密碼。
+   */
+  staffPassword?: string;
   log?: (msg: string) => void;
 }
 
@@ -226,6 +239,15 @@ export async function seedDatabase(prisma: PrismaClient, opts: SeedOptions = {})
   await prisma.menuItem.deleteMany();
   await prisma.category.deleteMany();
   await prisma.member.deleteMany();
+  await prisma.staff.deleteMany();
+
+  if (opts.staffPassword) {
+    const passwordHash = await hashPassword(opts.staffPassword);
+    for (const s of DEMO_STAFF) {
+      await prisma.staff.create({ data: { ...s, passwordHash } });
+    }
+    log('✓ ' + DEMO_STAFF.length + ' staff (' + DEMO_STAFF.map((s) => s.username + '=' + s.role).join(', ') + ')');
+  }
 
   for (const c of DEMO_CATEGORIES) {
     await prisma.category.create({ data: { ...c } });

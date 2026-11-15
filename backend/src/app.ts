@@ -5,6 +5,7 @@ import prismaPlugin from './plugins/prisma.js';
 import authPlugin from './plugins/auth.js';
 import socketPlugin from './plugins/socket.js';
 import authRoutes from './modules/auth/routes.js';
+import staffRoutes from './modules/staff/routes.js';
 import menuRoutes from './modules/menu/routes.js';
 import orderRoutes from './modules/orders/routes.js';
 import memberRoutes from './modules/members/routes.js';
@@ -24,6 +25,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(authPlugin);
   await app.register(socketPlugin);
   await app.register(authRoutes);
+  await app.register(staffRoutes);
   await app.register(menuRoutes);
   await app.register(orderRoutes);
   await app.register(memberRoutes);

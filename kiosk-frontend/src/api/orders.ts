@@ -14,7 +14,8 @@ export async function createOrder(payload: CreateOrderRequestBody): Promise<Crea
   return request<CreateOrderResponseBody>(API_PATHS.orders.base, {
     method: 'POST',
     body: payload,
-    noAuth: true, // 訂單建立時不一定登入(token 由 memberId 取代)
+    // 有登入會員時帶會員 JWT;後端以 token 判定會員身分(AC-011),訪客則不帶
+    auth: 'member',
   });
 }
 

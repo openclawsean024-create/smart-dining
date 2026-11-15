@@ -142,3 +142,17 @@ model PointsTransaction {
 
   member Member @relation(fields: [memberId], references: [id])
 }
+
+// ============================================================
+// Staff（AC-011）— 員工帳號與角色。密碼只存 bcrypt 雜湊，不存明碼。
+// role: MANAGER（店長）| CASHIER（收銀）| KITCHEN（內場）
+// ============================================================
+model Staff {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String
+  role         String
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}

@@ -16,6 +16,7 @@ import { useCartStore, computeDiscount } from '../store/cartStore';
 import { useUIStore } from '../store/uiStore';
 import { login as apiLogin, verify as apiVerify } from '../api/auth';
 import { createOrder } from '../api/orders';
+import { ApiError } from '../api/client';
 import type { Coupon, CartCustomizationSelection, Member } from '@smart-dining/contracts';
 import type { SelectedCoupon, AuthSession } from '../types';
 
@@ -220,7 +221,13 @@ export function CheckoutPage() {
         state: { order: res.order },
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : '建立訂單失敗');
+      if (e instanceof ApiError && e.status === 401) {
+        // 會員登入已失效:清掉登入狀態,讓顧客重新登入或以訪客身分結帳
+        logout();
+        setError('會員登入已過期,請重新登入,或直接以訪客身分結帳');
+      } else {
+        setError(e instanceof Error ? e.message : '建立訂單失敗');
+      }
     } finally {
       setBusy(false);
     }
