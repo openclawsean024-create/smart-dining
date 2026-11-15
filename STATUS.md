@@ -21,7 +21,7 @@
 |---|---|
 | `npm ci` | exit 0（673 個套件） |
 | `npm run build` | exit 0（contracts → backend → kiosk → mobile） |
-| `npm test` | exit 0：backend 9 檔 186 個 case、kiosk 4 檔 47 個 case 全數通過 |
+| `npm test` | exit 0：backend 10 檔 188 個 case、kiosk 4 檔 47 個 case 全數通過（Node 26 與 Node 20 皆實跑） |
 | `cd backend && npx tsc --noEmit` | exit 0 |
 | `npm run lint -w @smart-dining/kiosk` | exit 0 |
 | `npm run typecheck -w @smart-dining/mobile` | exit 0 |
@@ -31,6 +31,10 @@
 | `cd backend && npx vitest run src/**/pricing*.test.ts src/**/orders*.test.ts`（GOAL AC-002） | exit 0，3 檔 63 個 case |
 | `git grep -n "password: '"` | 只出現在文件中描述此檢查的文字 |
 | `git grep -n -E "09[0-9]{2}-?[0-9]{3}-?[0-9]{3}"`（排除 0900-000-xxx） | 無結果 |
+
+CI 首次執行（PR #3）`test` job 失敗，已修正：
+- KIOSK 元件測試在 Node 20 無法啟動：新裝的 jsdom 最新版要求 Node 22 以上 → 改為根目錄 devDependency `jsdom@^26`（支援 Node 18+）。本機以 Node v20.20.2 實跑 kiosk 47、backend 188 個 case 皆通過。
+- 並行下單在 CI 回 500（SQLite 寫入交易互搶鎖逾時）：建單交易改在 backend 內依序執行（`backend/src/lib/serialQueue.ts`，前提是單一行程部署），斷言未修改；新增 `serialQueue.ac003.test.ts`。
 
 已知但不在本階段處理：`npm ci` 回報 27 個相依套件弱點（npm audit；多為既有依賴），CI 尚未在 GitHub 上跑過（等 PR 觸發）。
 

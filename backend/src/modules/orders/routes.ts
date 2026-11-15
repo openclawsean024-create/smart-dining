@@ -9,6 +9,7 @@ import { parseOr400 } from '../../lib/http.js';
 import { isStaffClaims } from '../../plugins/auth.js';
 import { computeDiscount, MAX_LINE_QUANTITY, priceCart, PricingError } from '../../lib/pricing.js';
 import { serializeOrder } from '../../lib/orderSerializer.js';
+import { createSerialQueue } from '../../lib/serialQueue.js';
 
 const ORDER_STATUSES = ['QUEUED', 'PREPARING', 'COOKING', 'PLATING', 'READY', 'COMPLETED', 'CANCELLED'] as const;
 
@@ -51,6 +52,7 @@ const STATUS_BY_ROLE: Record<StaffRole, readonly OrderStatus[]> = {
 };
 
 const orderRoutes: FastifyPluginAsync = async (app) => {
+  const enqueueOrderWrite = createSerialQueue();
   /**
    * 下單時的會員身分（AC-011）：memberId 只能來自會員 JWT，不能由 body 任意指定。
    * 回傳 undefined 表示已回應錯誤；null 表示訪客訂單。
@@ -116,8 +118,10 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
       const totalAmount = priced.subtotal - discount;
 
       // 訂單號與取餐號以同一個時間點、依台灣時區的當日範圍計算（AC-003）
-      const now = new Date();
+      // createdAt 取「輪到這筆寫入」時的時間，確保流水號與建立時間的先後一致
+      let now = new Date();
       const createOrder = () => app.prisma.$transaction(async (tx) => {
+        now = new Date();
         const orderNo = await generateOrderNo(tx, now);
         const pickupNumber = await nextPickupNumber(tx, now);
         // 扣庫存（只針對有追蹤庫存的品項）；以「庫存足夠」為條件更新，並行下單不會扣成負數（AC-005）
@@ -164,11 +168,11 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
         return created;
       });
 
-      // 訂單號有唯一限制；若並行下單剛好取到同一個流水號（P2002），整筆交易重試。
+      // 建單交易依序執行（見 lib/serialQueue.ts）；訂單號仍有唯一限制作為最後防線，撞號時重試。
       let order: Awaited<ReturnType<typeof createOrder>> | undefined;
       for (let attempt = 1; !order; attempt++) {
         try {
-          order = await createOrder();
+          order = await enqueueOrderWrite(createOrder);
         } catch (e) {
           const isOrderNoConflict = e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
           if (!isOrderNoConflict || attempt >= 3) throw e;
