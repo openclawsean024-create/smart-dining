@@ -11,7 +11,7 @@
 | AC-001 | 基線與 CI 擋錯 | ✅ 完成（2026-11-16） | `backend/src/test/__tests__/baseline.ac001.test.ts`（13 個 case）；`npm run test:api`、`npm run test:e2e` |
 | AC-011 | 員工角色與 API 授權 | ✅ 完成（2026-11-16） | `backend/src/modules/__tests__/authz.ac011.test.ts`（59 個 case）；`kiosk-frontend/src/components/staff/__tests__/RequireStaff.ac011.test.tsx`（7 個 case） |
 | AC-002 | 伺服器端計價、券碼以 DB 為準 | ✅ 完成（2026-11-16） | `backend/src/lib/pricing.ac002.test.ts`（35 個 case）；`backend/src/modules/orders.pricing.ac002.test.ts`（24 個 case）；`kiosk-frontend/src/pages/__tests__/CheckoutPage.ac002.test.tsx`（7 個 case） |
-| AC-003 | 訂單號／取餐號依台灣時區 | ⏳ 未開始 | — |
+| AC-003 | 訂單號／取餐號依台灣時區 | ✅ 完成（2026-11-16） | `backend/src/lib/taipeiTime.ac003.test.ts`（5 個 case）；`backend/src/modules/orders.taipei.ac003.test.ts`（4 個 case，fake timers） |
 | AC-004 | 後台訂單清單與 KDS | ⏳ 未開始 | — |
 | AC-005 | 菜單管理 | ⏳ 未開始 | — |
 
@@ -50,6 +50,14 @@
 - 優惠券以資料庫為準：KIOSK 移除寫死的 `WELCOME10`／`SAVE50`，改由 `GET /api/members/:id/coupons` 取得（seed 為 `VIP10`、`WELCOME`）。不存在、已使用、過期或不屬於本人 → 400 `COUPON_INVALID`；計價失敗時不會把券標成已使用；並行下單不會重複使用同一張券。折扣取整數（百分比券四捨五入）。
 - KIOSK：結帳只送 ID 與數量，畫面金額標示為試算；客製化面板在必選群組沒選完前不能加入購物車；下單錯誤依 `code` 顯示中文說明。
 - GOAL 的驗證指令 `cd backend && npx vitest run src/**/pricing*.test.ts src/**/orders*.test.ts` 在 bash 與 zsh 皆可執行（2 檔 59 個 case）。
+
+### AC-003 完成內容
+
+- `backend/src/lib/taipeiTime.ts`：以 `Asia/Taipei` 計算當日日期與 00:00～隔日 00:00 的範圍；每次下單即時計算，不再於模組載入時固定「今天」。
+- 訂單號 `SD-YYYYMMDD-NNNN` 的日期改為台灣日期，流水號取同一台灣日既有訂單號最大值＋1；取餐號取同一台灣日最大值＋1。兩者與 `createdAt` 使用同一個時間點，在同一個交易內產生；訂單號撞號（P2002）時整筆交易重試。
+- 測試以 fake timers 驗證：台灣 23:59 → 00:01 不重啟即從 0001／取餐號 1 開始；台灣 07:59（UTC 仍是前一天）使用台灣日期；UTC 換日時不重置；並行 8 筆不重號。
+- 實測（2026-11-16 台灣時間凌晨）：`npm run test:e2e` 建立的訂單號為 `SD-20261116-0002`（修正前同一時段為 `SD-20261115-xxxx`）。
+- seed 的示範訂單與 `backend/scripts/ws-test.mjs` 的預設訂單號也改用台灣日期。
 
 ## Notion 商品資料庫對應
 

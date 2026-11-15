@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import type { OrderStatus, StaffRole } from '../../../../shared-contracts/src/index.js';
 import { nextPickupNumber } from '../../lib/pickupNumber.js';
 import { generateOrderNo } from '../../lib/orderNo.js';
@@ -113,12 +114,14 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
       const discount = computeDiscount(priced.subtotal, coupon);
       const totalAmount = priced.subtotal - discount;
 
-      const orderNo = await generateOrderNo(app.prisma);
-      const pickupNumber = await nextPickupNumber(app.prisma);
-      const order = await app.prisma.$transaction(async (tx) => {
+      // 訂單號與取餐號以同一個時間點、依台灣時區的當日範圍計算（AC-003）
+      const now = new Date();
+      const createOrder = () => app.prisma.$transaction(async (tx) => {
+        const orderNo = await generateOrderNo(tx, now);
+        const pickupNumber = await nextPickupNumber(tx, now);
         if (coupon) {
           // 以 usedAt: null 為條件更新，避免同一張券被並行的兩張訂單重複使用
-          const used = await tx.coupon.updateMany({ where: { id: coupon.id, usedAt: null }, data: { usedAt: new Date() } });
+          const used = await tx.coupon.updateMany({ where: { id: coupon.id, usedAt: null }, data: { usedAt: now } });
           if (used.count !== 1) throw new PricingError('COUPON_INVALID', 'invalid coupon');
         }
         const created = await tx.order.create({
@@ -129,7 +132,8 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
             subtotal: priced.subtotal,
             discount,
             pickupNumber,
-            estimatedReadyAt: new Date(Date.now() + 195000),
+            createdAt: now,
+            estimatedReadyAt: new Date(now.getTime() + 195000),
             items: {
               create: priced.lines.map((l) => ({
                 menuItemId: l.menuItemId,
@@ -147,6 +151,17 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
         if (memberId) await tx.member.update({ where: { id: memberId }, data: { points: { increment: Math.floor(priced.subtotal) } } });
         return created;
       });
+
+      // 訂單號有唯一限制；若並行下單剛好取到同一個流水號（P2002），整筆交易重試。
+      let order: Awaited<ReturnType<typeof createOrder>> | undefined;
+      for (let attempt = 1; !order; attempt++) {
+        try {
+          order = await createOrder();
+        } catch (e) {
+          const isOrderNoConflict = e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
+          if (!isOrderNoConflict || attempt >= 3) throw e;
+        }
+      }
       return reply.code(201).send({ order });
     } catch (e) {
       if (e instanceof PricingError) {

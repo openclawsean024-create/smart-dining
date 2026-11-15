@@ -7,6 +7,7 @@
  */
 import type { PrismaClient } from '@prisma/client';
 import { hashPassword } from './lib/password.js';
+import { orderNoPrefix } from './lib/orderNo.js';
 
 export const DEMO_MEMBERS = {
   vip: { id: 'member-vip', phone: '0900000001', name: '測試會員甲', points: 500, tier: 'GOLD' },
@@ -299,7 +300,7 @@ export async function seedDatabase(prisma: PrismaClient, opts: SeedOptions = {})
   log('✓ ' + Object.keys(DEMO_COUPONS).length + ' coupons (VIP10 / WELCOME)');
 
   if (opts.withDemoOrder ?? true) {
-    const orderNo = 'SD-' + new Date().toISOString().slice(0, 10).replaceAll('-', '') + '-0001';
+    const orderNo = orderNoPrefix() + '0001'; // 日期為台灣時區（AC-003）
     await prisma.order.create({
       data: {
         orderNo,
