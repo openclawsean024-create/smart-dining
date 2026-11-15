@@ -10,7 +10,7 @@
 |---|---|---|---|
 | AC-001 | 基線與 CI 擋錯 | ✅ 完成（2026-11-16） | `backend/src/test/__tests__/baseline.ac001.test.ts`（13 個 case）；`npm run test:api`、`npm run test:e2e` |
 | AC-011 | 員工角色與 API 授權 | ✅ 完成（2026-11-16） | `backend/src/modules/__tests__/authz.ac011.test.ts`（59 個 case）；`kiosk-frontend/src/components/staff/__tests__/RequireStaff.ac011.test.tsx`（7 個 case） |
-| AC-002 | 伺服器端計價、券碼以 DB 為準 | ⏳ 未開始 | — |
+| AC-002 | 伺服器端計價、券碼以 DB 為準 | ✅ 完成（2026-11-16） | `backend/src/lib/pricing.ac002.test.ts`（35 個 case）；`backend/src/modules/orders.pricing.ac002.test.ts`（24 個 case）；`kiosk-frontend/src/pages/__tests__/CheckoutPage.ac002.test.tsx`（7 個 case） |
 | AC-003 | 訂單號／取餐號依台灣時區 | ⏳ 未開始 | — |
 | AC-004 | 後台訂單清單與 KDS | ⏳ 未開始 | — |
 | AC-005 | 菜單管理 | ⏳ 未開始 | — |
@@ -42,6 +42,14 @@
 - 沒有任何明碼預設密碼：seed 的示範員工（`manager01`／`cashier01`／`kitchen01`）密碼來自環境變數 `SEED_STAFF_PASSWORD`，未設定時每次隨機產生並只在終端機顯示一次；測試與腳本的密碼皆執行時隨機產生。測試會掃描原始碼確認沒有 `password: '...'`、`admin/admin`。
 - KIOSK 前端：`/admin` 需員工登入（`RequireStaff`＋`StaffLoginForm`，token 放 sessionStorage），API client 區分會員／員工 token；下單改帶會員 JWT。
 - 尚未處理（不在本階段）：`DevOTPProvider` 的固定示範驗證碼仍是 dev 預設（真實簡訊 OTP 為 FR-085／M2）；正式環境上線前必須換掉，否則會員 JWT 可被任意取得。
+
+### AC-002 完成內容
+
+- `backend/src/lib/pricing.ts`（純函式）：單價＝`basePrice`＋所選 `priceDelta` 加總；品名與客製化名稱取自資料庫。改寫自 `restaurant-kiosk` 的 `computeLinePrice`／`computeCartTotal`（合併清單 #1）與 `pos-multitrade` `pricing.ts` 的驗證規則（#9）。
+- `POST /api/orders` 只採用品項 ID、數量、選項 ID；前端多送的 `unitPrice`／`name`／金額一律忽略。以下皆回 400（附 `code`）：空購物車、非 1～99 正整數數量、負價、品項不存在或已下架、選項不存在／不屬於該品項／已停用、單選群組多選、缺必選群組。
+- 優惠券以資料庫為準：KIOSK 移除寫死的 `WELCOME10`／`SAVE50`，改由 `GET /api/members/:id/coupons` 取得（seed 為 `VIP10`、`WELCOME`）。不存在、已使用、過期或不屬於本人 → 400 `COUPON_INVALID`；計價失敗時不會把券標成已使用；並行下單不會重複使用同一張券。折扣取整數（百分比券四捨五入）。
+- KIOSK：結帳只送 ID 與數量，畫面金額標示為試算；客製化面板在必選群組沒選完前不能加入購物車；下單錯誤依 `code` 顯示中文說明。
+- GOAL 的驗證指令 `cd backend && npx vitest run src/**/pricing*.test.ts src/**/orders*.test.ts` 在 bash 與 zsh 皆可執行（2 檔 59 個 case）。
 
 ## Notion 商品資料庫對應
 
@@ -78,7 +86,7 @@
 | FR | 名稱 | 優先 | 狀態 | 所在 |
 |---|---|---|---|---|
 | FR-001 | KIOSK 菜單瀏覽 | P0 | 已實作 | SD |
-| FR-002 | 品項客製化與加價 | P0 | 部分（後端未計加價） | SD、RK |
+| FR-002 | 品項客製化與加價 | P0 | 已實作（AC-002：後端計入加價） | SD |
 | FR-003 | 購物車 | P0 | 已實作 | SD |
 | FR-004 | KIOSK 結帳取號＋QR | P0 | 已實作 | SD |
 | FR-005 | 列印取餐單 | P0 | 部分（僅瀏覽器列印） | SD |
@@ -89,7 +97,7 @@
 | FR-010 | 多語系 | P2 | 部分 | PM |
 | FR-020 | OTP 登入 | P0 | 部分（無真實簡訊） | SD |
 | FR-021 | 點數累積 | P0 | 部分 | SD、PS |
-| FR-022 | 優惠券 | P0 | 部分（KIOSK 券碼與 DB 不一致） | SD |
+| FR-022 | 優惠券 | P0 | 已實作（AC-002：KIOSK 改用後端可用券） | SD |
 | FR-023 | 會員中心 | P1 | 已實作 | SD |
 | FR-024 | 會員等級升等 | P1 | 部分 | PS、SD |
 | FR-025 | 後台會員列表 | P1 | 部分 | PS |
@@ -104,14 +112,14 @@
 | FR-046 | 營業稅設定 | P0 | 部分 | PS |
 | FR-047 | 交班／開關帳 | P1 | 未實作 | — |
 | FR-048 | 離線收銀同步 | P1 | 未實作 | — |
-| FR-060 | 訂單推進＋廣播 | P0 | 已實作（無授權） | SD |
+| FR-060 | 訂單推進＋廣播 | P0 | 已實作（AC-011：需員工 JWT） | SD |
 | FR-061 | 後台訂單清單 | P0 | 部分（後端 API 缺） | SD |
 | FR-062 | KDS | P0 | 部分 | RK |
 | FR-063 | 菜單管理 | P0 | 部分 | RK、PS |
 | FR-064 | 分類與客製化群組管理 | P1 | 未實作 | — |
 | FR-065 | 成本／庫存／低庫存 | P1 | 部分 | PS |
 | FR-066 | 營收報表 | P0 | 部分 | PS、PM |
-| FR-067 | 員工角色與登入 | P0 | 部分（明碼密碼，不可沿用） | PS |
+| FR-067 | 員工角色與登入 | P0 | 已實作（AC-011：bcrypt＋角色 JWT；員工帳號管理 UI 未做） | SD |
 | FR-068 | 打卡 | P2 | 部分 | PS |
 | FR-069 | 店家設定 | P1 | 部分 | PS |
 | FR-070 | 規則式經營提醒 | P2 | 部分 | PS |

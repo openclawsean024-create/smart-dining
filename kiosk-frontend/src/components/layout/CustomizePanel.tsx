@@ -42,8 +42,17 @@ export function CustomizePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingMenuItemId]);
 
+  // 必選群組都選了才能加入購物車(後端下單時也會驗證,缺必選會回 400;AC-002)
+  const missingRequired = useMemo(() => {
+    if (!editingItem) return [];
+    return (editingItem.customizationGroups ?? []).filter(
+      (g) => g.required && (pendingSelections[g.id] ?? []).length === 0,
+    );
+  }, [editingItem, pendingSelections]);
+  const canConfirm = missingRequired.length === 0;
+
   function handleConfirm() {
-    if (!editingItem) return;
+    if (!editingItem || !canConfirm) return;
     confirmPending(editingItem);
   }
 
@@ -134,9 +143,13 @@ export function CustomizePanel() {
               <button
                 type="button"
                 onClick={handleConfirm}
-                className="flex-1 h-[60px] rounded-2xl bg-primary text-white font-black text-kiosk-lg btn-press hover:bg-primary-600 active:bg-primary-700 shadow focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/40"
+                disabled={!canConfirm}
+                data-testid="customize-confirm"
+                className="flex-1 h-[60px] rounded-2xl bg-primary text-white font-black text-kiosk-lg btn-press hover:bg-primary-600 active:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed shadow focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/40"
               >
-                完成客製 → 加入購物車 · ${previewPrice.toLocaleString()}
+                {canConfirm
+                  ? '完成客製 → 加入購物車 · $' + previewPrice.toLocaleString()
+                  : '請先選擇:' + missingRequired.map((g) => g.groupName).join('、')}
               </button>
             </div>
           </div>

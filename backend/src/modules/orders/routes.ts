@@ -6,10 +6,35 @@ import { generateOrderNo } from '../../lib/orderNo.js';
 import { broadcastStatusChange } from '../../lib/orderEvents.js';
 import { parseOr400 } from '../../lib/http.js';
 import { isStaffClaims } from '../../plugins/auth.js';
+import { computeDiscount, MAX_LINE_QUANTITY, priceCart, PricingError } from '../../lib/pricing.js';
 
 const ORDER_STATUSES = ['QUEUED', 'PREPARING', 'COOKING', 'PLATING', 'READY', 'COMPLETED', 'CANCELLED'] as const;
 
 const updateStatusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
+
+/**
+ * 下單 request body（AC-002）。每一行只採用 menuItemId、quantity、選項 ID；
+ * 舊版前端多送的 name／unitPrice／choiceNames 會被忽略（zod 預設剝除未知欄位）。
+ */
+const createOrderSchema = z.object({
+  cart: z.object({
+    items: z
+      .array(
+        z.object({
+          menuItemId: z.string().min(1),
+          quantity: z.number().int().positive().max(MAX_LINE_QUANTITY),
+          customizations: z
+            .array(z.object({ groupId: z.string().min(1), choiceIds: z.array(z.string().min(1)).max(50) }))
+            .max(50)
+            .optional(),
+        }),
+      )
+      .min(1)
+      .max(100),
+  }),
+  memberId: z.string().nullish(),
+  couponCode: z.string().trim().min(1).max(64).nullish(),
+});
 
 /**
  * 各角色可以設定的訂單狀態（AC-011）：
@@ -56,42 +81,79 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
     return tokenMemberId;
   }
 
+  /**
+   * POST /api/orders — 伺服器端計價（AC-002）。
+   * 只採用前端傳入的品項 ID、數量、選項 ID；價格與品名一律取自資料庫。
+   */
   app.post('/api/orders', async (request, reply) => {
-    const { cart, memberId: bodyMemberId, couponCode } = (request.body ?? {}) as any;
-    if (!cart?.items?.length) return reply.code(400).send({ error: 'cart required' });
+    const body = parseOr400(createOrderSchema, request.body, reply);
+    if (!body) return;
 
-    const memberId = await resolveOrderMember(request, reply, bodyMemberId);
+    const memberId = await resolveOrderMember(request, reply, body.memberId);
     if (memberId === undefined) return;
 
-    const ids = cart.items.map((x: any) => x.menuItemId);
-    const menu = await app.prisma.menuItem.findMany({ where: { id: { in: ids }, available: true } });
-    if (menu.length !== new Set(ids).size) return reply.code(400).send({ error: 'invalid menu item' });
-    const byId = new Map(menu.map((x) => [x.id, x]));
-    let subtotal = 0;
-    const lines = cart.items.map((x: any) => {
-      const base = byId.get(x.menuItemId)!;
-      const unitPrice = base.basePrice;
-      subtotal += unitPrice * x.quantity;
-      return { menuItemId: x.menuItemId, name: x.name, quantity: x.quantity, unitPrice, customizations: JSON.stringify(x.customizations ?? []), subtotal: unitPrice * x.quantity };
+    const ids = [...new Set(body.cart.items.map((x) => x.menuItemId))];
+    const menuItems = await app.prisma.menuItem.findMany({
+      where: { id: { in: ids } },
+      include: { customizationGroups: { orderBy: { displayOrder: 'asc' }, include: { choices: true } } },
     });
-    let discount = 0;
-    let coupon: Awaited<ReturnType<typeof app.prisma.coupon.findUnique>> = null;
-    if (couponCode) {
-      coupon = await app.prisma.coupon.findUnique({ where: { code: couponCode } });
-      if (!coupon || coupon.usedAt || coupon.expiresAt < new Date()) return reply.code(400).send({ error: 'invalid coupon' });
-      // 綁定會員的優惠券只能由該會員本人使用（AC-011）。
-      if (coupon.memberId && coupon.memberId !== memberId) return reply.code(400).send({ error: 'invalid coupon' });
-      discount = coupon.type === 'PERCENTAGE' ? subtotal * coupon.value / 100 : Math.min(subtotal, coupon.value);
+    const menu = new Map(menuItems.map((m) => [m.id, m]));
+
+    try {
+      const priced = priceCart(body.cart.items, menu);
+
+      let coupon: Awaited<ReturnType<typeof app.prisma.coupon.findUnique>> = null;
+      if (body.couponCode) {
+        coupon = await app.prisma.coupon.findUnique({ where: { code: body.couponCode } });
+        // 優惠券以資料庫為準：不存在、已使用、過期，或綁定其他會員（AC-011）都不可用
+        if (!coupon || coupon.usedAt || coupon.expiresAt < new Date() || (coupon.memberId && coupon.memberId !== memberId)) {
+          throw new PricingError('COUPON_INVALID', 'invalid coupon');
+        }
+      }
+      const discount = computeDiscount(priced.subtotal, coupon);
+      const totalAmount = priced.subtotal - discount;
+
+      const orderNo = await generateOrderNo(app.prisma);
+      const pickupNumber = await nextPickupNumber(app.prisma);
+      const order = await app.prisma.$transaction(async (tx) => {
+        if (coupon) {
+          // 以 usedAt: null 為條件更新，避免同一張券被並行的兩張訂單重複使用
+          const used = await tx.coupon.updateMany({ where: { id: coupon.id, usedAt: null }, data: { usedAt: new Date() } });
+          if (used.count !== 1) throw new PricingError('COUPON_INVALID', 'invalid coupon');
+        }
+        const created = await tx.order.create({
+          data: {
+            orderNo,
+            memberId,
+            totalAmount,
+            subtotal: priced.subtotal,
+            discount,
+            pickupNumber,
+            estimatedReadyAt: new Date(Date.now() + 195000),
+            items: {
+              create: priced.lines.map((l) => ({
+                menuItemId: l.menuItemId,
+                name: l.name,
+                quantity: l.quantity,
+                unitPrice: l.unitPrice,
+                subtotal: l.subtotal,
+                customizations: JSON.stringify(l.customizations),
+              })),
+            },
+            statusLogs: { create: { status: 'QUEUED', changedBy: 'system' } },
+          },
+          include: { items: true },
+        });
+        if (memberId) await tx.member.update({ where: { id: memberId }, data: { points: { increment: Math.floor(priced.subtotal) } } });
+        return created;
+      });
+      return reply.code(201).send({ order });
+    } catch (e) {
+      if (e instanceof PricingError) {
+        return reply.code(400).send({ error: e.message, code: e.code });
+      }
+      throw e;
     }
-    const orderNo = await generateOrderNo(app.prisma);
-    const pickupNumber = await nextPickupNumber(app.prisma);
-    const order = await app.prisma.$transaction(async (tx) => {
-      const created = await tx.order.create({ data: { orderNo, memberId, totalAmount: subtotal - discount, subtotal, discount, pickupNumber, estimatedReadyAt: new Date(Date.now() + 195000), items: { create: lines }, statusLogs: { create: { status: 'QUEUED', changedBy: 'system' } } } });
-      if (coupon) await tx.coupon.update({ where: { id: coupon.id }, data: { usedAt: new Date() } });
-      if (memberId) await tx.member.update({ where: { id: memberId }, data: { points: { increment: Math.floor(subtotal) } } });
-      return created;
-    });
-    return reply.code(201).send({ order });
   });
 
   // 以訂單號追蹤（顧客掃 QR 用）：公開，不含會員個資。

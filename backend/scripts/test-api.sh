@@ -56,7 +56,7 @@ order_payload() {
       const customizations = (item.customizationGroups ?? [])
         .filter((g) => g.required)
         .map((g) => ({ groupId: g.id, choiceIds: [g.choices[0].id] }));
-      process.stdout.write(JSON.stringify({ cart: { items: [{ menuItemId: item.id, name: item.name, quantity: 1, customizations }] } }));
+      process.stdout.write(JSON.stringify({ cart: { items: [{ menuItemId: item.id, quantity: 1, customizations }] } }));
     } catch { /* 菜單無效：回傳空字串，後續請求會失敗 */ }
   ' "$BODY"
 }

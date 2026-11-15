@@ -67,7 +67,7 @@ const created = await api('POST', '/api/orders', {
   expect: 201,
   token: vip.token,
   body: {
-    cart: { items: [{ menuItemId: mainItem.id, name: mainItem.name, quantity: 1, customizations: requiredSelections(mainItem) }] },
+    cart: { items: [{ menuItemId: mainItem.id, quantity: 1, customizations: requiredSelections(mainItem) }] },
     memberId: vip.member.id,
     couponCode: 'VIP10',
   },
@@ -118,7 +118,7 @@ const guestOrder = await api('POST', '/api/orders', {
   expect: 201,
   token: guest.token,
   body: {
-    cart: { items: [{ menuItemId: cola.id, name: cola.name, quantity: 2, customizations: requiredSelections(cola) }] },
+    cart: { items: [{ menuItemId: cola.id, quantity: 2, customizations: requiredSelections(cola) }] },
     memberId: guest.member.id,
   },
 });
