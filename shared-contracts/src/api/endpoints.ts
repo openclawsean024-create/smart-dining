@@ -100,6 +100,19 @@ export interface AdvanceOrderResponseBody {
   advanced: boolean;
 }
 
+/** 後台／KDS 的進行中訂單（AC-004）。 */
+export interface AdminOrder extends Order {
+  /** 品項摘要，例如「經典脆雞 x 1 · 可樂(中) x 2」 */
+  itemSummary: string;
+}
+
+export interface AdminOrdersResponseBody {
+  /** 依建立時間由舊到新 */
+  orders: AdminOrder[];
+  /** 伺服器時間（ISO 8601），用來計算等待時間 */
+  serverTime: string;
+}
+
 // ============================================================
 // Members
 // ============================================================
@@ -151,6 +164,7 @@ export const API_PATHS = {
     updateStatus: (orderNo: string) => `/api/orders/${orderNo}/status`,
   },
   admin: {
+    orders: '/api/admin/orders',
     advanceOrder: (orderNo: string) => `/api/admin/orders/${orderNo}/advance`,
   },
   members: {

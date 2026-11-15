@@ -75,5 +75,22 @@ export interface SocketData {
   memberId?: string;
 }
 
+// ============================================================
+// KDS namespace（AC-004）— 需員工 JWT：io(url + '/kds', { auth: { token } })
+// 後端在訂單建立或狀態變更時通知，KDS 收到後重新抓 GET /api/admin/orders。
+// ============================================================
+
+export interface KdsOrderChangedEvent {
+  orderNo: string;
+  status: OrderStatus;
+  reason: 'created' | 'status';
+}
+
+export interface KdsServerToClientEvents {
+  'kds:orderChanged': (payload: KdsOrderChangedEvent) => void;
+}
+
+export const KDS_NAMESPACE = '/kds';
+
 export const TRACKING_NAMESPACE = '/tracking';
 export const orderRoom = (orderNo: string): string => `order:${orderNo}`;

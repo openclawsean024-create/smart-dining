@@ -12,7 +12,7 @@
 | AC-011 | 員工角色與 API 授權 | ✅ 完成（2026-11-16） | `backend/src/modules/__tests__/authz.ac011.test.ts`（59 個 case）；`kiosk-frontend/src/components/staff/__tests__/RequireStaff.ac011.test.tsx`（7 個 case） |
 | AC-002 | 伺服器端計價、券碼以 DB 為準 | ✅ 完成（2026-11-16） | `backend/src/lib/pricing.ac002.test.ts`（35 個 case）；`backend/src/modules/orders.pricing.ac002.test.ts`（24 個 case）；`kiosk-frontend/src/pages/__tests__/CheckoutPage.ac002.test.tsx`（7 個 case） |
 | AC-003 | 訂單號／取餐號依台灣時區 | ✅ 完成（2026-11-16） | `backend/src/lib/taipeiTime.ac003.test.ts`（5 個 case）；`backend/src/modules/orders.taipei.ac003.test.ts`（4 個 case，fake timers） |
-| AC-004 | 後台訂單清單與 KDS | ⏳ 未開始 | — |
+| AC-004 | 後台訂單清單與 KDS | ✅ 完成（2026-11-16） | `backend/src/modules/admin.orders.ac004.test.ts`（13 個 case）；`kiosk-frontend/src/pages/admin/__tests__/KdsPage.ac004.test.tsx`（20 個 case，含 restaurant-kiosk 的 6 個 KDS 情境）；Playwright `e2e/kds-flow.ac004.spec.ts`（2 個 case） |
 | AC-005 | 菜單管理 | ⏳ 未開始 | — |
 
 ### AC-001 完成內容
@@ -58,6 +58,16 @@
 - 測試以 fake timers 驗證：台灣 23:59 → 00:01 不重啟即從 0001／取餐號 1 開始；台灣 07:59（UTC 仍是前一天）使用台灣日期；UTC 換日時不重置；並行 8 筆不重號。
 - 實測（2026-11-16 台灣時間凌晨）：`npm run test:e2e` 建立的訂單號為 `SD-20261116-0002`（修正前同一時段為 `SD-20261115-xxxx`）。
 - seed 的示範訂單與 `backend/scripts/ws-test.mjs` 的預設訂單號也改用台灣日期。
+
+### AC-004 完成內容
+
+- `GET /api/admin/orders`（任何員工角色）：只回傳進行中訂單（QUEUED～READY），依建立時間由舊到新；每筆含取餐號、品項、客製化（已解析成陣列）、品項摘要，另回 `serverTime`。回應不含會員手機。
+- 訂單 API 的 `items[].customizations` 一律輸出為陣列（原本是 JSON 字串，手機明細頁無法顯示），並以契約名稱 `statusLog` 提供狀態紀錄。
+- 修正 `GET /api/menu` 回應欄位：依契約改為 `categories[].items`（原本是 Prisma 的 `menuItems`，KIOSK 首頁因此顯示不出任何品項；E2E 測試發現）。
+- 新增 Socket.IO `/kds` namespace（握手需員工 JWT，停用帳號連不上）：訂單建立或狀態變更時送 `kds:orderChanged`。手機端 `/tracking` 事件不變。
+- KIOSK 新增 `/admin/kds`（改寫自 restaurant-kiosk `KdsPage.tsx`）：取餐號大字、品項與客製化、等待時間（以伺服器時間計算，超過 10 分鐘警示色）、一鍵推進；內場／店長可推進製作階段，收銀／店長可在「可取餐」按完成取餐（與後端角色限制一致）；`/kds` 通知即時更新＋每 10 秒輪詢備援；失敗時顯示錯誤，不再顯示假資料。舊的 `AdminPanel`（含 DEMO 假訂單與失敗時樂觀更新）移除，`/admin` 導向 KDS。
+- restaurant-kiosk `web/tests/e2e.test.tsx` 的 6 個 KDS 情境（nav、空狀態、有單不顯示空狀態、顯示單號、依等待時間排序、推進按鈕）改寫為元件測試，全數保留。
+- Playwright（設定模式參考 pos-multitrade）：`npm run test:e2e` 自動啟動 backend（暫存 SQLite＋seed，埠 4100）、KIOSK（5273）、手機（5274），員工密碼與 JWT secret 每次隨機產生。主流程「KIOSK 下單 → KDS 推進到 READY → 手機追蹤頁顯示可取餐」：手機頁不重新整理，靠 Socket 事件由 10% 更新到 100%。已加入 CI `e2e` job。Vite 預先打包依賴，避免冷啟動時頁面重新載入造成不穩定（本機連跑 8 次與清快取冷跑皆通過）。
 
 ## Notion 商品資料庫對應
 
@@ -121,8 +131,8 @@
 | FR-047 | 交班／開關帳 | P1 | 未實作 | — |
 | FR-048 | 離線收銀同步 | P1 | 未實作 | — |
 | FR-060 | 訂單推進＋廣播 | P0 | 已實作（AC-011：需員工 JWT） | SD |
-| FR-061 | 後台訂單清單 | P0 | 部分（後端 API 缺） | SD |
-| FR-062 | KDS | P0 | 部分 | RK |
+| FR-061 | 後台訂單清單 | P0 | 已實作（AC-004） | SD |
+| FR-062 | KDS | P0 | 已實作（AC-004） | SD |
 | FR-063 | 菜單管理 | P0 | 部分 | RK、PS |
 | FR-064 | 分類與客製化群組管理 | P1 | 未實作 | — |
 | FR-065 | 成本／庫存／低庫存 | P1 | 部分 | PS |

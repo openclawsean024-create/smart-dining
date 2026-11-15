@@ -1,10 +1,20 @@
 /**
- * Admin API — 門市端推進訂單狀態 / 取得訂單清單。皆需員工 JWT(AC-011)。
+ * Admin API — 後台訂單清單、推進與完成取餐。皆需員工 JWT(AC-011)。
  */
 import { request } from './client';
 import { API_PATHS } from '@smart-dining/contracts';
-import type { AdvanceOrderResponseBody } from '@smart-dining/contracts';
+import type {
+  AdminOrdersResponseBody,
+  AdvanceOrderResponseBody,
+  UpdateOrderStatusResponseBody,
+} from '@smart-dining/contracts';
 
+/** 進行中訂單(QUEUED～READY),依建立時間由舊到新(AC-004)。 */
+export async function listActiveOrders(): Promise<AdminOrdersResponseBody> {
+  return request<AdminOrdersResponseBody>(API_PATHS.admin.orders, { method: 'GET', auth: 'staff' });
+}
+
+/** 推進到下一個製作階段(店長、內場)。 */
 export async function advanceOrder(orderNo: string): Promise<AdvanceOrderResponseBody> {
   return request<AdvanceOrderResponseBody>(API_PATHS.admin.advanceOrder(orderNo), {
     method: 'POST',
@@ -12,25 +22,11 @@ export async function advanceOrder(orderNo: string): Promise<AdvanceOrderRespons
   });
 }
 
-export interface AdminActiveOrderItem {
-  orderNo: string;
-  pickupNumber: number;
-  status: import('@smart-dining/contracts').OrderStatus;
-  createdAt: string;
-  totalAmount: number;
-  itemSummary: string;
-}
-
-/**
- * 取得所有進行中訂單的最小展示資料。
- * 後端的 GET /api/admin/orders 於 AC-004 補上;在那之前失敗時回傳空陣列。
- */
-export async function listActiveOrders(): Promise<AdminActiveOrderItem[]> {
-  type ListResp = { orders: AdminActiveOrderItem[] };
-  try {
-    const res = await request<ListResp>('/api/admin/orders', { method: 'GET', auth: 'staff' });
-    return res.orders ?? [];
-  } catch {
-    return [];
-  }
+/** 顧客已取餐:READY → COMPLETED(店長、收銀)。 */
+export async function completeOrder(orderNo: string): Promise<UpdateOrderStatusResponseBody> {
+  return request<UpdateOrderStatusResponseBody>(API_PATHS.orders.updateStatus(orderNo), {
+    method: 'PATCH',
+    body: { status: 'COMPLETED' },
+    auth: 'staff',
+  });
 }

@@ -15,6 +15,9 @@ export function broadcastStatusChange(
   const timestamp = new Date().toISOString();
   const room = app.io.of('/tracking').to(orderRoom(order.orderNo));
 
+  // 通知 KDS／後台重新整理（只有已登入的員工連得上 /kds）
+  app.kds.emit('kds:orderChanged', { orderNo: order.orderNo, status, reason: 'status' });
+
   // 1. order:statusChanged — 所有狀態變更都發
   room.emit('order:statusChanged', {
     orderNo: order.orderNo,

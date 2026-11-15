@@ -35,7 +35,7 @@ backend 啟動、`db:*` 指令需要 `DATABASE_URL` 與 `JWT_SECRET`（`backend/
 | API 冒煙腳本 | `cd backend && npm run test:api` | 可用（AC-001）：每個請求比對狀態碼，404／500／連不上即 exit 1；同樣自帶測試 backend；已進 CI `e2e` job |
 | 前端元件測試（KIOSK） | `npm test -w @smart-dining/kiosk` | 可用（AC-011 起）：vitest＋jsdom＋Testing Library。mobile-app **尚未配置** |
 | API 整合測試（Fastify inject） | `cd backend && npm test` | 可用（AC-001 起）：vitest `globalSetup` 建立 SQLite 範本，每個測試 app 使用獨立複本；不需要 `.env` |
-| 瀏覽器 E2E（Playwright） | — | **尚未配置**（M1 AC-004～AC-006、AC-010） |
+| 瀏覽器 E2E（Playwright） | `npm run test:e2e`（根目錄） | 可用（AC-004 起）：先 build shared-contracts，再自動啟動 backend :4100（暫存 SQLite＋seed）、KIOSK :5273、手機 :5274；員工密碼與 JWT secret 每次隨機產生。首次需 `npx playwright install chromium`。已進 CI `e2e` job |
 | Format | — | **尚未配置** |
 | Coverage | — | **尚未配置** |
 

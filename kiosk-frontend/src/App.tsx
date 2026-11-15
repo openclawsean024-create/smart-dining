@@ -2,19 +2,21 @@
  * App — routes
  *
  * 路由:
- *   /                → DashboardPage(主畫面,3 欄 + 底部客製化 + checkout/pickup modal)
- *   /checkout        → CheckoutPage(也作為 modal 開啟,當 modal 開啟時顯示)
+ *   /                  → DashboardPage(主畫面,3 欄 + 底部客製化 + checkout/pickup modal)
+ *   /checkout          → CheckoutPage(也作為 modal 開啟,當 modal 開啟時顯示)
  *   /complete/:orderNo → CompletePage
- *   /admin           → AdminPanel(門市端推進狀態;需員工登入,AC-011)
- *   *                → NotFoundPage
+ *   /admin             → 後台(需員工登入,AC-011);預設導向 /admin/kds
+ *   /admin/kds         → KdsPage 廚房顯示系統(AC-004)
+ *   *                  → NotFoundPage
  */
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { DashboardPage } from './pages/DashboardPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { CompletePage } from './pages/CompletePage';
-import { AdminPanel } from './pages/AdminPanel';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { AdminLayout } from './pages/admin/AdminLayout';
+import { KdsPage } from './pages/admin/KdsPage';
 import { PickupModal } from './components/PickupModal';
 import { RequireStaff } from './components/staff/RequireStaff';
 import { useUIStore } from './store/uiStore';
@@ -35,9 +37,10 @@ function CheckoutRouteListener() {
   return null;
 }
 
-export default function App() {
+/** 路由本體(不含 Router),測試時可包在 MemoryRouter 內。 */
+export function AppRoutes() {
   return (
-    <BrowserRouter>
+    <>
       {/* 全域 modal:PickupModal 與 CheckoutModal 本身依 store 自動 mount */}
       <PickupModal />
       <CheckoutPage />
@@ -50,12 +53,23 @@ export default function App() {
           path="/admin"
           element={
             <RequireStaff>
-              <AdminPanel />
+              <AdminLayout />
             </RequireStaff>
           }
-        />
+        >
+          <Route index element={<Navigate to="/admin/kds" replace />} />
+          <Route path="kds" element={<KdsPage />} />
+        </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
     </BrowserRouter>
   );
 }

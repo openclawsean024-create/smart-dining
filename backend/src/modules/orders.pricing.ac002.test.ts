@@ -100,7 +100,7 @@ describe('AC-002 POST /api/orders 伺服器端計價', () => {
     expect(res.statusCode).toBe(201);
     const item = res.json().order.items[0];
     expect(item.name).toBe('經典脆雞');
-    expect(item.customizations).not.toContain('假');
+    expect(JSON.stringify(item.customizations)).not.toContain('假');
     expect(res.body).not.toContain('script');
   });
 

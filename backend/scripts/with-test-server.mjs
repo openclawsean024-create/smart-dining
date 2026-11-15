@@ -9,13 +9,9 @@
  * 用法：node scripts/with-test-server.mjs <command> [args...]
  * JWT_SECRET 與示範員工密碼每次隨機產生，不落地、不進版本庫。
  */
-import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { createServer } from 'node:net';
-import { fileURLToPath } from 'node:url';
+import { freePort, prepareDatabase, startServer, stopServer, waitForHealth } from './lib/test-backend.mjs';
 
 const [command, ...args] = process.argv.slice(2);
 if (!command) {
@@ -23,60 +19,22 @@ if (!command) {
   process.exit(2);
 }
 
-const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const bin = (name) => resolve(backendRoot, '..', 'node_modules', '.bin', name);
-
-function freePort() {
-  return new Promise((res, rej) => {
-    const srv = createServer();
-    srv.on('error', rej);
-    srv.listen(0, '127.0.0.1', () => {
-      const { port } = srv.address();
-      srv.close(() => res(port));
-    });
-  });
-}
-
-async function waitForHealth(base, child, timeoutMs = 30_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error('backend exited early with code ' + child.exitCode);
-    try {
-      const r = await fetch(base + '/healthz');
-      if (r.ok) return;
-    } catch {
-      /* not up yet */
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error('backend did not become healthy within ' + timeoutMs + 'ms');
-}
-
-const tmp = mkdtempSync(join(tmpdir(), 'smart-dining-e2e-'));
-const port = await freePort();
-const apiBase = 'http://127.0.0.1:' + port;
-const staffPassword = randomBytes(18).toString('base64url');
-const env = {
-  ...process.env,
-  SEED_STAFF_PASSWORD: staffPassword,
-  E2E_STAFF_PASSWORD: staffPassword,
-  NODE_ENV: 'test',
-  DATABASE_URL: 'file:' + join(tmp, 'e2e.db'),
-  JWT_SECRET: randomBytes(32).toString('hex'),
-  PORT: String(port),
-  OTP_PROVIDER: 'dev',
-  API_BASE: apiBase,
-};
-
 let server;
+let cleanup = () => {};
 let exitCode = 1;
 try {
-  execFileSync(bin('prisma'), ['db', 'push', '--schema', 'prisma/schema.prisma', '--skip-generate'], {
-    cwd: backendRoot, env, stdio: 'pipe',
+  const port = await freePort();
+  const apiBase = 'http://127.0.0.1:' + port;
+  const staffPassword = randomBytes(18).toString('base64url');
+  const prepared = prepareDatabase({
+    port,
+    jwtSecret: randomBytes(32).toString('hex'),
+    staffPassword,
+    extraEnv: { API_BASE: apiBase, E2E_STAFF_PASSWORD: staffPassword },
   });
-  execFileSync(bin('tsx'), ['src/seed.ts'], { cwd: backendRoot, env, stdio: 'pipe' });
+  cleanup = prepared.cleanup;
 
-  server = spawn(bin('tsx'), ['src/server.ts'], { cwd: backendRoot, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = startServer(prepared.env);
   let serverLog = '';
   server.stdout.on('data', (d) => { serverLog += d; });
   server.stderr.on('data', (d) => { serverLog += d; });
@@ -88,18 +46,15 @@ try {
   }
 
   exitCode = await new Promise((res) => {
-    const child = spawn(command, args, { env, stdio: 'inherit' });
+    const child = spawn(command, args, { env: prepared.env, stdio: 'inherit' });
     child.on('error', (e) => { console.error(e.message); res(127); });
     child.on('exit', (code, signal) => res(code ?? (signal ? 1 : 0)));
   });
 } catch (e) {
-  console.error('[with-test-server] ' + (e?.stderr?.toString?.() || e?.message || e));
+  console.error('[with-test-server] ' + (e?.message || e));
   exitCode = 1;
 } finally {
-  if (server && server.exitCode === null) {
-    server.kill('SIGTERM');
-    await new Promise((r) => { server.on('exit', r); setTimeout(r, 3000); });
-  }
-  rmSync(tmp, { recursive: true, force: true });
+  await stopServer(server);
+  cleanup();
 }
 process.exit(exitCode);

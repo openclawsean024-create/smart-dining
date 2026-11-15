@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // 啟動時就預先打包這些依賴；避免第一次進到某頁（例如 KDS 的 socket.io-client）時
+  // Vite 才發現新依賴而整頁重新載入（冷啟動的 E2E 會因此不穩定）
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-dom/client', 'react-router-dom', 'zustand', 'zustand/middleware', 'swr', 'clsx', 'qrcode', 'socket.io-client'],
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',

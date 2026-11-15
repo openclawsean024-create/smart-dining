@@ -414,7 +414,7 @@ describe('AC-011 repo 內沒有明碼預設密碼', () => {
     const patterns = [
       /password\s*[:=]\s*['"`][^'"`$]+['"`]/i, // password: 'xxx'（不含樣板字串變數）
       /passwordHash\s*[:=]\s*['"`]/i,
-      /admin\s*\/\s*admin/i,
+      /\badmin\s*\/\s*admin\b/i, // 完整單字；路徑如 pages/admin/AdminLayout 不算
       /\bpin\s*[:=]\s*['"`]\d{4,}['"`]/i,
     ];
     for (const root of ROOTS) {

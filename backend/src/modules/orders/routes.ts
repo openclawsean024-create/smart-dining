@@ -8,6 +8,7 @@ import { broadcastStatusChange } from '../../lib/orderEvents.js';
 import { parseOr400 } from '../../lib/http.js';
 import { isStaffClaims } from '../../plugins/auth.js';
 import { computeDiscount, MAX_LINE_QUANTITY, priceCart, PricingError } from '../../lib/pricing.js';
+import { serializeOrder } from '../../lib/orderSerializer.js';
 
 const ORDER_STATUSES = ['QUEUED', 'PREPARING', 'COOKING', 'PLATING', 'READY', 'COMPLETED', 'CANCELLED'] as const;
 
@@ -162,7 +163,8 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
           if (!isOrderNoConflict || attempt >= 3) throw e;
         }
       }
-      return reply.code(201).send({ order });
+      app.kds.emit('kds:orderChanged', { orderNo: order.orderNo, status: 'QUEUED', reason: 'created' });
+      return reply.code(201).send({ order: serializeOrder(order) });
     } catch (e) {
       if (e instanceof PricingError) {
         return reply.code(400).send({ error: e.message, code: e.code });
@@ -176,7 +178,7 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
     const { orderNo } = request.params as { orderNo: string };
     const order = await app.prisma.order.findUnique({ where: { orderNo }, include: { items: true, statusLogs: { orderBy: { changedAt: 'asc' } } } });
     if (!order) return reply.code(404).send({ error: 'not found' });
-    return { order };
+    return { order: serializeOrder(order) };
   });
 
   // 會員歷史訂單：只允許本人或店長（AC-011）。
@@ -188,7 +190,7 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
       const rawLimit = Number((request.query as { limit?: string }).limit ?? 20);
       const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 20;
       const orders = await app.prisma.order.findMany({ where: { memberId }, orderBy: { createdAt: 'desc' }, take: limit, include: { items: true, statusLogs: true } });
-      return { orders };
+      return { orders: orders.map(serializeOrder) };
     },
   );
 
@@ -214,7 +216,7 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
       });
     });
     broadcastStatusChange(app, order, body.status);
-    return { order };
+    return { order: serializeOrder(order) };
   });
 };
 

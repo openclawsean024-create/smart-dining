@@ -13,6 +13,9 @@ export type OrderStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
+/** 進行中的訂單狀態（後台清單與 KDS 顯示的範圍；AC-004）。 */
+export const ACTIVE_ORDER_STATUSES = ['QUEUED', 'PREPARING', 'COOKING', 'PLATING', 'READY'] as const;
+
 /**
  * 顧客在購物車中選擇的客製化明細,序列化後存入 OrderItem.customizations。
  */
