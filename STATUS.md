@@ -9,7 +9,7 @@
 | AC | 內容 | 狀態 | 測試（名稱皆標 AC 編號） |
 |---|---|---|---|
 | AC-001 | 基線與 CI 擋錯 | ✅ 完成（2026-11-16） | `backend/src/test/__tests__/baseline.ac001.test.ts`（13 個 case）；`npm run test:api`、`npm run test:e2e` |
-| AC-011 | 員工角色與 API 授權 | ✅ 完成（2026-11-16） | `backend/src/modules/__tests__/authz.ac011.test.ts`（59 個 case）；`kiosk-frontend/src/components/staff/__tests__/RequireStaff.ac011.test.tsx`（7 個 case） |
+| AC-011 | 員工角色與 API 授權 | ✅ 完成（2026-11-16） | `backend/src/modules/__tests__/authz.ac011.test.ts`（60 個 case）；`backend/src/lib/__tests__/verifyCode.test.ts`；`kiosk-frontend/src/components/staff/__tests__/RequireStaff.ac011.test.tsx`（7 個 case） |
 | AC-002 | 伺服器端計價、券碼以 DB 為準 | ✅ 完成（2026-11-16） | `backend/src/lib/pricing.ac002.test.ts`（35 個 case）；`backend/src/modules/orders.pricing.ac002.test.ts`（24 個 case）；`kiosk-frontend/src/pages/__tests__/CheckoutPage.ac002.test.tsx`（7 個 case） |
 | AC-003 | 訂單號／取餐號依台灣時區 | ✅ 完成（2026-11-16） | `backend/src/lib/taipeiTime.ac003.test.ts`（5 個 case）；`backend/src/modules/orders.taipei.ac003.test.ts`（4 個 case，fake timers） |
 | AC-004 | 後台訂單清單與 KDS | ✅ 完成（2026-11-16） | `backend/src/modules/admin.orders.ac004.test.ts`（13 個 case）；`kiosk-frontend/src/pages/admin/__tests__/KdsPage.ac004.test.tsx`（20 個 case，含 restaurant-kiosk 的 6 個 KDS 情境）；Playwright `e2e/kds-flow.ac004.spec.ts`（2 個 case） |
@@ -21,7 +21,7 @@
 |---|---|
 | `npm ci` | exit 0（673 個套件） |
 | `npm run build` | exit 0（contracts → backend → kiosk → mobile） |
-| `npm test` | exit 0：backend 10 檔 188 個 case、kiosk 4 檔 47 個 case 全數通過（Node 26 與 Node 20 皆實跑） |
+| `npm test` | exit 0：backend 10 檔 192 個 case、kiosk 4 檔 47 個 case 全數通過（Node 26 與 Node 20 皆實跑） |
 | `cd backend && npx tsc --noEmit` | exit 0 |
 | `npm run lint -w @smart-dining/kiosk` | exit 0 |
 | `npm run typecheck -w @smart-dining/mobile` | exit 0 |
@@ -66,7 +66,10 @@ GitHub Actions（PR #3，Node 20，commit `a5667c0`，run 43758097646）：Lint 
 
 - 沒有任何明碼預設密碼：seed 的示範員工（`manager01`／`cashier01`／`kitchen01`）密碼來自環境變數 `SEED_STAFF_PASSWORD`，未設定時每次隨機產生並只在終端機顯示一次；測試與腳本的密碼皆執行時隨機產生。測試會掃描原始碼確認沒有 `password: '...'`、`admin/admin`。
 - KIOSK 前端：`/admin` 需員工登入（`RequireStaff`＋`StaffLoginForm`，token 放 sessionStorage），API client 區分會員／員工 token；下單改帶會員 JWT。
-- 尚未處理（不在本階段）：`DevOTPProvider` 的固定示範驗證碼仍是 dev 預設（真實簡訊 OTP 為 FR-085／M2）；正式環境上線前必須換掉，否則會員 JWT 可被任意取得。
+- 移除會員登入的固定驗證碼 `1234`：預設改為 `MockOTPProvider`（一次性、隨機 6 位數、5 分鐘有效、猜錯即作廢）；`DevOTPProvider` 不再內建驗證碼，只有明確設定 `OTP_PROVIDER=dev` 並以 `OTP_DEV_CODE`（至少 6 位數）提供時才可用；`NODE_ENV=production` 時拒絕使用 dev／mock provider（啟動即失敗），API 也不回傳驗證碼提示。KIOSK 與手機登入改為 6 位數，移除「Demo:1234」字樣。
+  - `verifyCode.test.ts` 原本斷言「預設為固定碼 provider」「1234 可通過」「`DEMO_VERIFY_CODE` 為 1234」的案例，依 GOAL AC-011 的規格變更改寫為斷言相反行為（1234 不可用、預設為一次性 provider、不再匯出示範碼）。
+- 原始碼掃描測試維持原本的嚴格規則（`admin/admin`）；先前的誤判來源（匯入路徑 `pages/admin/AdminLayout`）改為將元件更名為 `StaffLayout`，未放寬規則。
+- 正式環境的會員登入需等真實簡訊 provider（FR-085，M2）。
 
 ### AC-002 完成內容
 

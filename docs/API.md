@@ -56,7 +56,7 @@ curl -s http://localhost:4000/healthz
 
 ### `POST /api/auth/login`
 
-發送登入驗證碼(Demo 階段固定回傳 `1234`)。
+發送一次性 6 位數驗證碼(開發／測試環境會顯示在畫面與 API 回應中;正式環境需接真實簡訊,FR-085)。
 
 - **Auth**:❌
 - **Request Body**(`LoginRequestBody`):
@@ -65,7 +65,7 @@ curl -s http://localhost:4000/healthz
 ```
 - **Response 200**(`LoginResponseBody`):
 ```json
-{ "code": "1234", "message": "Development verification code" }
+{ "code": "<6 位數,只在非正式環境回傳>", "message": "Verification code sent" }
 ```
 - **Response 400**:`{ "error": "phone required" }`
 
@@ -85,7 +85,7 @@ curl -s -X POST http://localhost:4000/api/auth/login \
 - **Auth**:❌
 - **Request Body**(`VerifyRequestBody`):
 ```json
-{ "phone": "0900000001", "code": "1234" }
+{ "phone": "0900000001", "code": "<login 回傳的 6 位數>" }
 ```
 - **Response 200**(`VerifyResponseBody`):
 ```json
@@ -107,7 +107,7 @@ curl -s -X POST http://localhost:4000/api/auth/login \
 ```bash
 curl -s -X POST http://localhost:4000/api/auth/verify \
   -H 'Content-Type: application/json' \
-  -d '{"phone":"0900000001","code":"1234"}'
+  -d '{"phone":"0900000001","code":"<6 位數驗證碼>"}'
 ```
 
 ---
@@ -541,7 +541,7 @@ BASE=http://localhost:4000
 # 1. 登入 + 驗證
 TOKEN=$(curl -s -X POST $BASE/api/auth/verify \
   -H 'Content-Type: application/json' \
-  -d '{"phone":"0900000001","code":"1234"}' | jq -r .token)
+  -d '{"phone":"0900000001","code":"<6 位數驗證碼>"}' | jq -r .token)
 
 # 2. 建立訂單
 curl -s -X POST $BASE/api/orders \

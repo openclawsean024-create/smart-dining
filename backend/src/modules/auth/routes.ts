@@ -17,10 +17,8 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     const result = await provider.send(body.phone);
 
     return {
-      // In dev/mock mode the provider surfaces the code via `devHint` so
-      // local testing stays trivial. Real SMS providers (Twilio etc.) will
-      // not set `devHint`, so `code` will be `undefined` in production.
-      code: result.devHint,
+      // 開發／測試時回傳驗證碼提示；正式環境一律不回傳（真實簡訊 provider 也不會提供 devHint）。
+      code: process.env.NODE_ENV === 'production' ? undefined : result.devHint,
       message: 'Verification code sent',
     };
   });

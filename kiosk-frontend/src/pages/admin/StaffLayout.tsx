@@ -1,5 +1,5 @@
 /**
- * AdminLayout — 後台共用外框:導覽列(KDS／菜單管理)、目前登入的員工、登出。
+ * StaffLayout — 後台共用外框:導覽列(KDS／菜單管理)、目前登入的員工、登出。
  * 內容區由巢狀路由(<Outlet />)決定。
  */
 import { Link, NavLink, Outlet } from 'react-router-dom';
@@ -13,7 +13,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
   );
 
-export function AdminLayout() {
+export function StaffLayout() {
   const staff = useStaffStore((s) => s.staff);
   const clear = useStaffStore((s) => s.clear);
 

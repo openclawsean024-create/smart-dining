@@ -44,7 +44,7 @@ export function prepareDatabase({ port, jwtSecret, staffPassword, extraEnv = {},
     DATABASE_URL: 'file:' + join(tmp, 'e2e.db'),
     JWT_SECRET: jwtSecret,
     PORT: String(port),
-    OTP_PROVIDER: 'dev',
+    OTP_PROVIDER: 'mock', // 一次性隨機驗證碼；腳本從 login 回應的 code 取得
     SEED_STAFF_PASSWORD: staffPassword,
     ...extraEnv,
   };

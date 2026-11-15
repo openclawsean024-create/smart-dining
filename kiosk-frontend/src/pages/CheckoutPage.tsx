@@ -152,7 +152,7 @@ export function CheckoutPage() {
   }
 
   async function doVerify() {
-    if (code.length < 4) {
+    if (code.length < 6) {
       setError('請輸入驗證碼');
       return;
     }
@@ -349,7 +349,7 @@ export function CheckoutPage() {
                   <>
                     <label className="block">
                       <span className="font-bold text-sm text-gray-700">
-                        驗證碼(Demo:1234)
+                        驗證碼(6 位數)
                       </span>
                       <div className="mt-1 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-black text-kiosk-2xl text-gray-900 tracking-widest">
                         {code || '____'}
@@ -359,7 +359,7 @@ export function CheckoutPage() {
                       value={code}
                       onChange={setCode}
                       mode="code"
-                      maxLength={4}
+                      maxLength={6}
                       disabled={busy}
                     />
                     <div className="flex gap-2">
@@ -372,7 +372,7 @@ export function CheckoutPage() {
                       </button>
                       <button
                         type="button"
-                        disabled={busy || code.length < 4}
+                        disabled={busy || code.length < 6}
                         onClick={doVerify}
                         className="flex-1 h-touch rounded-xl bg-primary text-white font-black text-kiosk-base btn-press hover:bg-primary-600 disabled:bg-gray-300 shadow"
                       >

@@ -137,6 +137,24 @@ describe('AC-011 員工登入與密碼雜湊', () => {
     }
   });
 
+  it('AC-011 會員登入不再接受固定驗證碼 1234：只有這次寄出的一次性驗證碼有效', async () => {
+    const phone = '0900000199';
+    const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { phone } });
+    expect(login.statusCode).toBe(200);
+    const sent: string = login.json().code;
+    expect(sent).toMatch(/^\d{6}$/);
+
+    const fixed = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: '1234' } });
+    expect(fixed.statusCode).toBe(401);
+    // 猜錯一次就作廢，原本寄出的碼也不能再用
+    const afterGuess = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: sent } });
+    expect(afterGuess.statusCode).toBe(401);
+
+    const again = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { phone } });
+    const ok = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: again.json().code } });
+    expect(ok.statusCode).toBe(200);
+  });
+
   it('AC-011 連續登入失敗達上限後回 429', async () => {
     const victim = await createStaff(app, 'KITCHEN');
     for (let i = 0; i < MAX_FAILURES; i++) {
@@ -415,7 +433,7 @@ describe('AC-011 repo 內沒有明碼預設密碼', () => {
     const patterns = [
       /password\s*[:=]\s*['"`][^'"`$]+['"`]/i, // 例如 password 後接冒號與引號包住的字面值（不含樣板字串變數）
       /passwordHash\s*[:=]\s*['"`]/i,
-      /\badmin\s*\/\s*admin\b/i, // 完整單字；路徑如 pages/admin/AdminLayout 不算
+      /admin\s*\/\s*admin/i,
       /\bpin\s*[:=]\s*['"`]\d{4,}['"`]/i,
     ];
     for (const root of ROOTS) {

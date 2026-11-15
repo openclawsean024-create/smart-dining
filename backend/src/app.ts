@@ -11,6 +11,7 @@ import orderRoutes from './modules/orders/routes.js';
 import memberRoutes from './modules/members/routes.js';
 import adminRoutes from './modules/admin/routes.js';
 import adminMenuRoutes from './modules/admin/menuRoutes.js';
+import { getOTPProvider } from './lib/verifyCode.js';
 
 export interface BuildAppOptions {
   /** 關閉 logger（測試用）。預設開啟。 */
@@ -20,6 +21,8 @@ export interface BuildAppOptions {
 }
 
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
+  // OTP 設定錯誤（例如正式環境仍用 mock／dev）時在啟動就失敗，而不是等到第一次登入（AC-011）
+  getOTPProvider();
   const app = Fastify({ logger: opts.logger ?? true });
   await app.register(cors, { origin: env.CORS_ORIGIN.split(',') });
   await app.register(prismaPlugin, { databaseUrl: opts.databaseUrl });

@@ -16,7 +16,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { CompletePage } from './pages/CompletePage';
 import { NotFoundPage } from './pages/NotFoundPage';
-import { AdminLayout } from './pages/admin/AdminLayout';
+import { StaffLayout } from './pages/admin/StaffLayout';
 import { KdsPage } from './pages/admin/KdsPage';
 import { MenuAdminPage } from './pages/admin/MenuAdminPage';
 import { PickupModal } from './components/PickupModal';
@@ -55,7 +55,7 @@ export function AppRoutes() {
           path="/admin"
           element={
             <RequireStaff>
-              <AdminLayout />
+              <StaffLayout />
             </RequireStaff>
           }
         >
