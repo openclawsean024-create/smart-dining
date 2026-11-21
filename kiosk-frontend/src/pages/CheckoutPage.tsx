@@ -3,7 +3,8 @@
  *
  * 上半部:PriceSummary
  * 中間:會員登入(電話 + 驗證碼)
- * 優惠券選擇下拉
+ * 優惠券選擇下拉:選項來自後端 GET /api/members/:id/coupons(以資料庫為準,AC-002)
+ * 畫面上的金額只作顯示;實際金額由後端依品項 ID、數量、選項 ID 計算
  * 底部:「確認結帳 $XXX」大按鈕
  * 結帳成功 → 跳 CompletePage
  */
@@ -16,31 +17,13 @@ import { useCartStore, computeDiscount } from '../store/cartStore';
 import { useUIStore } from '../store/uiStore';
 import { login as apiLogin, verify as apiVerify } from '../api/auth';
 import { createOrder } from '../api/orders';
-import type { Coupon, CartCustomizationSelection, Member } from '@smart-dining/contracts';
+import { ApiError } from '../api/client';
+import type { Coupon, Member, OrderLineInput } from '@smart-dining/contracts';
+import { getMemberCoupons } from '../api/members';
+import { orderErrorMessage } from '../api/errors';
 import type { SelectedCoupon, AuthSession } from '../types';
 
 type Step = 'phone' | 'code' | 'idle';
-
-const AVAILABLE_COUPONS: Coupon[] = [
-  {
-    id: 'cp-1',
-    code: 'WELCOME10',
-    type: 'PERCENTAGE',
-    value: 10,
-    expiresAt: '2099-12-31T23:59:59.000Z',
-    usedAt: null,
-    memberId: null,
-  },
-  {
-    id: 'cp-2',
-    code: 'SAVE50',
-    type: 'AMOUNT',
-    value: 50,
-    expiresAt: '2099-12-31T23:59:59.000Z',
-    usedAt: null,
-    memberId: null,
-  },
-];
 
 export function CheckoutPage() {
   const navigate = useNavigate();
@@ -68,6 +51,45 @@ export function CheckoutPage() {
       return null;
     }
   });
+
+  // 會員可用的優惠券:只來自後端(資料庫),不在前端寫死任何券碼
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
+  const memberId = member?.id ?? null;
+
+  useEffect(() => {
+    if (!open) return;
+    if (!memberId) {
+      setCoupons([]);
+      setCoupon(null); // 訪客沒有優惠券;同時清掉先前殘留的選擇
+      return;
+    }
+    let cancelled = false;
+    setCouponsLoading(true);
+    getMemberCoupons(memberId)
+      .then((res) => {
+        if (cancelled) return;
+        setCoupons(res.coupons);
+        const applied = useCartStore.getState().appliedCoupon;
+        if (applied && !res.coupons.some((c) => c.code === applied.code)) setCoupon(null);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setCoupons([]);
+        setCoupon(null);
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+          logout();
+          setError('會員登入已過期,請重新登入');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCouponsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, memberId]);
 
   const discount = useMemo(
     () => computeDiscount(subtotal, appliedCoupon),
@@ -130,7 +152,7 @@ export function CheckoutPage() {
   }
 
   async function doVerify() {
-    if (code.length < 4) {
+    if (code.length < 6) {
       setError('請輸入驗證碼');
       return;
     }
@@ -158,6 +180,8 @@ export function CheckoutPage() {
     setHint(null);
     setPhone('');
     setCode('');
+    setCoupons([]);
+    setCoupon(null);
   }
 
   function applyCoupon(c: Coupon | null) {
@@ -182,45 +206,36 @@ export function CheckoutPage() {
     setBusy(true);
     setError(null);
     try {
-      const cartItems = lines.map((l) => {
-        const customizations: CartCustomizationSelection[] = l.customizationGroups
-          .map((g) => {
-            const ids = l.customizations[g.id] ?? [];
-            const choiceNames = ids
-              .map((cid) => g.choices.find((c) => c.id === cid)?.name ?? '')
-              .filter(Boolean);
-            return {
-              groupId: g.id,
-              groupName: g.groupName,
-              choiceIds: ids,
-              choiceNames,
-            };
-          })
-          .filter((sel) => sel.choiceIds.length > 0);
-
-        return {
-          menuItemId: l.menuItemId,
-          name: l.name,
-          quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          customizations,
-        };
-      });
+      // 只送品項 ID、數量、選項 ID;價格與品名由後端從資料庫計算(AC-002)
+      const cartItems: OrderLineInput[] = lines.map((l) => ({
+        menuItemId: l.menuItemId,
+        quantity: l.quantity,
+        customizations: l.customizationGroups
+          .map((g) => ({ groupId: g.id, choiceIds: l.customizations[g.id] ?? [] }))
+          .filter((sel) => sel.choiceIds.length > 0),
+      }));
 
       const payload = {
         cart: { items: cartItems },
-        memberId: member?.id,
         couponCode: appliedCoupon?.code,
       };
       const res = await createOrder(payload);
       clearCart();
+      // KIOSK 是共用機台：下單完成就登出會員，下一位顧客不會沿用上一位的身分與優惠券
+      logout();
       setLatestOrderNo(res.order.orderNo);
       close();
       navigate('/complete/' + encodeURIComponent(res.order.orderNo), {
         state: { order: res.order },
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : '建立訂單失敗');
+      if (e instanceof ApiError && e.status === 401) {
+        // 會員登入已失效:清掉登入狀態,讓顧客重新登入或以訪客身分結帳
+        logout();
+        setError('會員登入已過期,請重新登入,或直接以訪客身分結帳');
+      } else {
+        setError(orderErrorMessage(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -336,7 +351,7 @@ export function CheckoutPage() {
                   <>
                     <label className="block">
                       <span className="font-bold text-sm text-gray-700">
-                        驗證碼(Demo:1234)
+                        驗證碼(6 位數)
                       </span>
                       <div className="mt-1 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-black text-kiosk-2xl text-gray-900 tracking-widest">
                         {code || '____'}
@@ -346,7 +361,7 @@ export function CheckoutPage() {
                       value={code}
                       onChange={setCode}
                       mode="code"
-                      maxLength={4}
+                      maxLength={6}
                       disabled={busy}
                     />
                     <div className="flex gap-2">
@@ -359,7 +374,7 @@ export function CheckoutPage() {
                       </button>
                       <button
                         type="button"
-                        disabled={busy || code.length < 4}
+                        disabled={busy || code.length < 6}
                         onClick={doVerify}
                         className="flex-1 h-touch rounded-xl bg-primary text-white font-black text-kiosk-base btn-press hover:bg-primary-600 disabled:bg-gray-300 shadow"
                       >
@@ -387,29 +402,41 @@ export function CheckoutPage() {
           {/* 優惠券 */}
           <section className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
             <h3 className="font-black text-kiosk-lg text-gray-900 mb-3">優惠券</h3>
-            <select
-              className="w-full h-touch rounded-xl bg-white border-2 border-gray-200 px-4 font-bold text-kiosk-base text-gray-900 focus:outline-none focus:border-primary"
-              value={appliedCoupon?.code ?? ''}
-              onChange={(e) => {
-                const code = e.target.value;
-                if (!code) {
-                  applyCoupon(null);
-                  return;
-                }
-                const c = AVAILABLE_COUPONS.find((cp) => cp.code === code);
-                if (c) applyCoupon(c);
-              }}
-            >
-              <option value="">不使用優惠券</option>
-              {AVAILABLE_COUPONS.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.code} ·{' '}
-                  {c.type === 'PERCENTAGE'
-                    ? `折扣 ${c.value}%`
-                    : `折抵 NT$ ${c.value}`}
-                </option>
-              ))}
-            </select>
+            {!member ? (
+              <p className="text-kiosk-sm text-gray-500 font-bold" data-testid="coupon-login-hint">
+                登入會員後即可使用您的優惠券
+              </p>
+            ) : couponsLoading ? (
+              <p className="text-kiosk-sm text-gray-500 font-bold">載入優惠券中…</p>
+            ) : coupons.length === 0 ? (
+              <p className="text-kiosk-sm text-gray-500 font-bold" data-testid="coupon-empty">
+                目前沒有可用的優惠券
+              </p>
+            ) : (
+              <select
+                className="w-full h-touch rounded-xl bg-white border-2 border-gray-200 px-4 font-bold text-kiosk-base text-gray-900 focus:outline-none focus:border-primary"
+                value={appliedCoupon?.code ?? ''}
+                aria-label="選擇優惠券"
+                data-testid="coupon-select"
+                onChange={(e) => {
+                  const code = e.target.value;
+                  if (!code) {
+                    applyCoupon(null);
+                    return;
+                  }
+                  const c = coupons.find((cp) => cp.code === code);
+                  if (c) applyCoupon(c);
+                }}
+              >
+                <option value="">不使用優惠券</option>
+                {coupons.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} ·{' '}
+                    {c.type === 'PERCENTAGE' ? '折扣 ' + c.value + '%' : '折抵 NT$ ' + c.value}
+                  </option>
+                ))}
+              </select>
+            )}
           </section>
 
           {error && (
@@ -437,9 +464,13 @@ export function CheckoutPage() {
           >
             {busy ? '送出中…' : `確認結帳 $${total.toLocaleString()}`}
           </button>
-          {isEmpty && (
+          {isEmpty ? (
             <p className="mt-2 text-center text-sm text-gray-400 font-bold">
               購物車為空,請先選擇餐點
+            </p>
+          ) : (
+            <p className="mt-2 text-center text-xs text-gray-400 font-bold">
+              畫面金額為試算,實際金額以送出後系統計算為準
             </p>
           )}
         </div>

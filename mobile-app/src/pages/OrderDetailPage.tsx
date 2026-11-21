@@ -74,10 +74,13 @@ export function OrderDetailPage() {
           <ProgressBar currentStage={stage} />
 
           <div className="text-center">
-            <div className="number-display text-[72px] leading-none font-extrabold text-brand-500">
+            <div
+              className="number-display text-[72px] leading-none font-extrabold text-brand-500"
+              data-testid="track-percentage"
+            >
               {percentage}%
             </div>
-            <div className="mt-1 text-ink-700">
+            <div className="mt-1 text-ink-700" data-testid="track-stage">
               {stageMeta?.displayName ?? '處理中'}
             </div>
           </div>

@@ -10,7 +10,7 @@
 ## 啟動
 
 ```bash
-cd /Users/sean/Documents/Agent\ space/smart-dining
+cd <smart-dining repo 路徑>
 npm install
 npm run dev --workspace=@smart-dining/mobile
 ```

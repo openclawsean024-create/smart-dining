@@ -24,7 +24,7 @@ export function LoginPage() {
     setBusy(true);
     try {
       const res = await requestLoginCode(phone.trim());
-      setHint(`已寄出驗證碼(Demo:${res.code})`);
+      setHint(res.code ? `已寄出驗證碼(開發環境提示:${res.code})` : '已寄出驗證碼,請查看簡訊');
       setStep('code');
     } catch (err) {
       setError(err instanceof Error ? err.message : '請求驗證碼失敗');
@@ -68,7 +68,7 @@ export function LoginPage() {
               autoComplete="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="0912345678"
+              placeholder="0900000001"
               className="w-full rounded-2xl border-2 border-ink-100 bg-white px-4 py-4 text-base focus:border-brand-500 focus:outline-none"
             />
           </label>
@@ -95,12 +95,12 @@ export function LoginPage() {
             <input
               type="text"
               inputMode="numeric"
-              pattern="\d{4}"
-              maxLength={4}
+              pattern="\d{6}"
+              maxLength={6}
               autoComplete="one-time-code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="1234"
+              placeholder="6 位數驗證碼"
               className="w-full rounded-2xl border-2 border-ink-100 bg-white px-4 py-4 text-base tracking-widest text-center focus:border-brand-500 focus:outline-none"
             />
           </label>
@@ -115,9 +115,6 @@ export function LoginPage() {
         </form>
       )}
 
-      <div className="mt-6 text-center text-xs text-ink-500">
-        Demo 階段固定驗證碼:<span className="font-mono">1234</span>
-      </div>
       <div className="mt-10 text-center">
         <Link to="/" className="text-sm text-brand-500 underline">暫不登入,繼續追蹤訂單</Link>
       </div>

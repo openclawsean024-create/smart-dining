@@ -8,9 +8,10 @@
  * 實際 HTTP 介面在 backend 端實作。
  */
 
-import type { Category, MenuItem, CustomizationGroup } from '../types/menu.js';
+import type { AdminMenuItem, Category, MenuItem, CustomizationGroup } from '../types/menu.js';
 import type { Cart, Order } from '../types/order.js';
 import type { Member, Coupon } from '../types/member.js';
+import type { Staff } from '../types/staff.js';
 
 // ============================================================
 // Auth
@@ -21,7 +22,8 @@ export interface LoginRequestBody {
 }
 
 export interface LoginResponseBody {
-  code: string;
+  /** 只有 dev／mock OTP provider 會回傳；正式簡訊 provider 不回傳。 */
+  code?: string;
   message: string;
 }
 
@@ -36,11 +38,41 @@ export interface VerifyResponseBody {
 }
 
 // ============================================================
+// Staff（AC-011）— 員工登入後取得員工 JWT，後台／KDS／管理 API 皆需此 token
+// ============================================================
+
+export interface StaffLoginRequestBody {
+  username: string;
+  password: string;
+}
+
+export interface StaffLoginResponseBody {
+  token: string;
+  staff: Staff;
+}
+
+export interface StaffMeResponseBody {
+  staff: Staff;
+}
+
+// ============================================================
 // Menu
 // ============================================================
 
+/** KIOSK 菜單：只含上架、未刪除、庫存不為 0 的品項（AC-005）。 */
 export interface MenuResponseBody {
   categories: Array<Category & { items: Array<MenuItem & { customizationGroups: CustomizationGroup[] }> }>;
+}
+
+/** 後台菜單管理（AC-005；店長）。 */
+export interface AdminMenuResponseBody {
+  categories: Category[];
+  /** 不含已刪除的品項 */
+  items: AdminMenuItem[];
+}
+
+export interface AdminMenuItemResponseBody {
+  item: AdminMenuItem;
 }
 
 // ============================================================
@@ -67,7 +99,8 @@ export interface GetMemberOrdersResponseBody {
 
 export interface UpdateOrderStatusRequestBody {
   status: Order['status'];
-  changedBy: string;
+  /** @deprecated 後端一律以員工 JWT 的身分記錄，忽略此欄位。 */
+  changedBy?: string;
 }
 
 export interface UpdateOrderStatusResponseBody {
@@ -77,6 +110,19 @@ export interface UpdateOrderStatusResponseBody {
 export interface AdvanceOrderResponseBody {
   order: Order;
   advanced: boolean;
+}
+
+/** 後台／KDS 的進行中訂單（AC-004）。 */
+export interface AdminOrder extends Order {
+  /** 品項摘要，例如「經典脆雞 x 1 · 可樂(中) x 2」 */
+  itemSummary: string;
+}
+
+export interface AdminOrdersResponseBody {
+  /** 依建立時間由舊到新 */
+  orders: AdminOrder[];
+  /** 伺服器時間（ISO 8601），用來計算等待時間 */
+  serverTime: string;
 }
 
 // ============================================================
@@ -118,6 +164,10 @@ export const API_PATHS = {
     login: '/api/auth/login',
     verify: '/api/auth/verify',
   },
+  staff: {
+    login: '/api/staff/login',
+    me: '/api/staff/me',
+  },
   menu: '/api/menu',
   orders: {
     base: '/api/orders',
@@ -126,6 +176,9 @@ export const API_PATHS = {
     updateStatus: (orderNo: string) => `/api/orders/${orderNo}/status`,
   },
   admin: {
+    orders: '/api/admin/orders',
+    menuItems: '/api/admin/menu/items',
+    menuItem: (id: string) => `/api/admin/menu/items/${id}`,
     advanceOrder: (orderNo: string) => `/api/admin/orders/${orderNo}/advance`,
   },
   members: {

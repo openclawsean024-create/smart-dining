@@ -3,3 +3,6 @@ dist
 data/*.db
 .env.local
 *.log
+
+# 測試用 SQLite（vitest globalSetup 產生）
+.test-db/

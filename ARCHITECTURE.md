@@ -90,7 +90,7 @@ flowchart LR
 | POST | `/api/members/:id/points/add` | 加減點數 | `AddPointsRequestBody` | `AddPointsResponseBody` |
 | GET  | `/healthz` | 健康檢查 | — | `HealthResponseBody` |
 
-> Demo 階段固定驗證碼:`1234`。
+> 會員登入使用一次性 6 位數驗證碼(開發／測試環境會顯示在畫面與 API 回應中;正式環境需接真實簡訊,FR-085)。
 
 ## 5. WebSocket 事件表
 
@@ -131,7 +131,7 @@ flowchart LR
 ### 7.2 安全性
 
 - **認證:** JWT(HS256),`Authorization: Bearer <token>`。
-- **密碼/驗證碼:** Demo 階段不存密碼,僅固定驗證碼 `1234`;正式版接 OTP provider。
+- **密碼/驗證碼:** 會員不存密碼,使用一次性 6 位數驗證碼(開發／測試環境會顯示在畫面與 API 回應中;正式環境需接真實簡訊,FR-085);員工密碼以 bcrypt 雜湊(AC-011)。
 - **個資:** 會員資料以最少必要為原則儲存(僅 phone + name + points)。
 - **SQL Injection:** 全程透過 Prisma ORM,不拼接原生 SQL。
 - **CORS:** KIOSK 與 mobile 限定來源,backend 啟動時設定 allowlist。

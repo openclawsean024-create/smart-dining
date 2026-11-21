@@ -48,7 +48,7 @@ if [ -f "$PIDS_DIR/backend.pid" ] && kill -0 "$(cat "$PIDS_DIR/backend.pid")" 2>
 else
   echo "▶ 啟動 backend..."
   cd "$PROJECT_ROOT/backend"
-  nohup npm run dev >"$LOGS_DIR/backend.log" 2>&1 &
+  OTP_EXPOSE_HINT=1 nohup npm run dev >"$LOGS_DIR/backend.log" 2>&1 &
   echo $! >"$PIDS_DIR/backend.pid"
 fi
 
@@ -104,8 +104,8 @@ echo "   ├─ Mobile APP: http://localhost:5174"
 echo "   └─ Backend API: http://localhost:4000"
 echo ""
 echo "📋 Demo 帳號:"
-echo "   VIP  會員: 0912345678 / 驗證碼 1234"
-echo "   一般會員: 0987654321 / 驗證碼 1234"
+echo "   VIP  會員: 0900000001(一次性 6 位數驗證碼,開發環境會顯示在畫面上)"
+echo "   一般會員: 0900000002"
 echo ""
 echo "📊 日誌位置: $LOGS_DIR/"
 echo "🛑 停止服務: ./scripts/stop-all.sh"

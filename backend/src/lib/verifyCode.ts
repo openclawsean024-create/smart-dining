@@ -1,28 +1,27 @@
 /**
  * OTP Provider abstraction for the smart-dining backend.
  *
- * The legacy implementation hardcoded `'1234'` for every phone number.
- * That was fine for a single-store demo, but it cannot ship to production:
- *   - No real SMS delivery.
- *   - One universal code is a security hole (anyone who knows it can sign in
- *     as anyone).
+ * AC-011：不再有任何寫死的預設驗證碼（舊版對所有手機號碼都接受 '1234'，
+ * 知道這個碼的人可以冒用任何會員登入）。
  *
- * This module defines an `OTPProvider` interface that the auth routes depend
- * on, plus a development-only implementation (`DevOTPProvider`) that preserves
- * the demo behaviour for local hacking, and a `MockOTPProvider` that does an
- * in-memory one-time-code flow useful for staging and tests.
+ * - `MockOTPProvider`（預設）：每次寄送產生隨機 6 位數（crypto）、一次性、5 分鐘有效的驗證碼；
+ *   連續猜錯 MAX_ATTEMPTS 次才作廢（猜錯一次就作廢的話，任何人都能讓別人的驗證碼失效）。
+ * - `DevOTPProvider`：固定驗證碼，只在明確設定 `OTP_PROVIDER=dev` 且以
+ *   `OTP_DEV_CODE` 提供驗證碼時才可用（本機手動測試用），repo 內不寫死任何值。
+ * - 正式環境（NODE_ENV=production）拒絕使用上述兩者：真實簡訊 provider（FR-085，M2）
+ *   上線前，正式環境不能用假 OTP 登入會員。
  *
- * Adding Twilio / Every8d / 三竹資訊 later means writing one more class that
- * satisfies the interface and adding a `case` in `getOTPProvider()`. No
- * auth-route changes required.
+ * 新增真實簡訊供應商時，實作 OTPProvider 並在 getOTPProvider() 加一個 case 即可。
  */
 
+import { randomInt } from 'node:crypto';
+
 export interface OTPSendResult {
-  /** Identifier returned by the upstream provider (e.g. Twilio SID). */
+  /** Identifier returned by the upstream provider (e.g. an SMS message id). */
   providerMessageId?: string;
   /**
-   * Short hint shown to the developer in dev/mock mode. NEVER trust this
-   * in production — real SMS providers must NOT set this.
+   * 開發／測試時給開發者看的驗證碼提示。真實簡訊 provider 不得設定此欄位；
+   * auth 路由在 NODE_ENV=production 時也不會回傳它。
    */
   devHint?: string;
 }
@@ -34,16 +33,20 @@ export interface OTPProvider {
   verify(phone: string, code: string): Promise<boolean>;
 }
 
+/** 固定驗證碼的最短長度（避免設定成 1234 這類容易猜的短碼）。 */
+export const DEV_CODE_MIN_LENGTH = 6;
+
 /**
- * Development-only provider. Always issues the same code (`'1234'`) so the
- * demo flow stays runnable without SMS infrastructure.
- *
- * Loudly warns on first use — anyone seeing the warning in production logs
- * should know to swap providers before merging.
+ * 固定驗證碼 provider（只供本機手動測試）。驗證碼由建構子傳入，沒有預設值。
  */
 export class DevOTPProvider implements OTPProvider {
-  static readonly DEMO_CODE = '1234';
   private static warned = false;
+
+  constructor(private readonly code: string) {
+    if (!/^\d+$/.test(code) || code.length < DEV_CODE_MIN_LENGTH) {
+      throw new Error(`[OTP] DevOTPProvider code must be at least ${DEV_CODE_MIN_LENGTH} digits`);
+    }
+  }
 
   private warnOnce(): void {
     if (DevOTPProvider.warned) return;
@@ -54,36 +57,37 @@ export class DevOTPProvider implements OTPProvider {
 
   async send(_phone: string): Promise<OTPSendResult> {
     this.warnOnce();
-    return { devHint: DevOTPProvider.DEMO_CODE };
+    return { devHint: this.code };
   }
 
   async verify(_phone: string, code: string): Promise<boolean> {
     this.warnOnce();
-    return code === DevOTPProvider.DEMO_CODE;
+    return code === this.code;
   }
 }
 
 interface MockOTPEntry {
   code: string;
   expiresAt: number;
+  failures: number;
 }
 
 /**
- * In-memory provider used for tests and local demos that want to see real
- * 6-digit codes flow through the system without standing up SMS.
+ * 記憶體內的一次性驗證碼 provider（預設）。
  *
- * Not for production: codes are lost on restart, there is no rate limiting,
- * and the store is unbounded.
+ * 不適合正式環境：重啟即失效、沒有發送頻率限制，也沒有真的寄簡訊。
  */
 export class MockOTPProvider implements OTPProvider {
   static readonly CODE_LENGTH = 6;
   static readonly TTL_MS = 5 * 60 * 1000;
+  /** 同一組驗證碼最多可猜錯幾次；達上限即作廢，需重新寄送。 */
+  static readonly MAX_ATTEMPTS = 5;
 
   private store = new Map<string, MockOTPEntry>();
 
   private generateCode(): string {
     const max = 10 ** MockOTPProvider.CODE_LENGTH;
-    const n = Math.floor(Math.random() * max);
+    const n = randomInt(0, max);
     return n.toString().padStart(MockOTPProvider.CODE_LENGTH, '0');
   }
 
@@ -92,6 +96,7 @@ export class MockOTPProvider implements OTPProvider {
     this.store.set(phone, {
       code,
       expiresAt: Date.now() + MockOTPProvider.TTL_MS,
+      failures: 0,
     });
     return { devHint: code };
   }
@@ -99,41 +104,54 @@ export class MockOTPProvider implements OTPProvider {
   async verify(phone: string, code: string): Promise<boolean> {
     const entry = this.store.get(phone);
     if (!entry) return false;
-    // One-time: remove on access regardless of outcome so a guess attempt
-    // also consumes the code (avoids brute-force replay).
-    this.store.delete(phone);
-    if (entry.expiresAt < Date.now()) return false;
-    return entry.code === code;
+    if (entry.expiresAt < Date.now()) {
+      this.store.delete(phone);
+      return false;
+    }
+    if (entry.code === code) {
+      // 一次性：驗證成功即刪除
+      this.store.delete(phone);
+      return true;
+    }
+    // 猜錯：累計次數，達上限才作廢（6 位數、最多 5 次，猜中機率 0.0005%）
+    entry.failures += 1;
+    if (entry.failures >= MockOTPProvider.MAX_ATTEMPTS) this.store.delete(phone);
+    return false;
   }
 }
 
 let cached: OTPProvider | null = null;
 
 /**
- * Resolve the configured provider based on the `OTP_PROVIDER` environment
- * variable. Defaults to `DevOTPProvider` so the local demo flow keeps
- * working without configuration.
- *
- * Supported values:
- *   - `dev`  → DevOTPProvider (default)
- *   - `mock` → MockOTPProvider
- *
- * Any other value throws so a misconfigured production deploy fails fast
- * instead of silently sending codes to the demo provider.
+ * 依環境變數 `OTP_PROVIDER` 取得 provider：
+ *   - 未設定或 `mock` → MockOTPProvider（一次性隨機碼）
+ *   - `dev` → DevOTPProvider，驗證碼取自 `OTP_DEV_CODE`（必填、至少 6 位數）
+ * 其他值、或在 NODE_ENV=production 使用 dev／mock 時直接丟錯，讓錯誤設定在啟動時就失敗。
  */
 export function getOTPProvider(): OTPProvider {
   if (cached) return cached;
-  const choice = (process.env.OTP_PROVIDER ?? 'dev').toLowerCase();
+  const choice = (process.env.OTP_PROVIDER ?? 'mock').toLowerCase();
+  if ((choice === 'mock' || choice === 'dev') && process.env.NODE_ENV === 'production') {
+    throw new Error(
+      `[OTP] OTP_PROVIDER='${choice}' is not allowed in production. ` +
+        'Configure a real SMS provider (FR-085) before enabling member login.',
+    );
+  }
   switch (choice) {
-    case 'dev':
-      cached = new DevOTPProvider();
-      return cached;
     case 'mock':
       cached = new MockOTPProvider();
       return cached;
+    case 'dev': {
+      const code = process.env.OTP_DEV_CODE;
+      if (!code) {
+        throw new Error('[OTP] OTP_PROVIDER=dev requires OTP_DEV_CODE (no built-in default code).');
+      }
+      cached = new DevOTPProvider(code);
+      return cached;
+    }
     default:
       throw new Error(
-        `[OTP] Unknown OTP_PROVIDER='${choice}'. Supported: dev, mock. ` +
+        `[OTP] Unknown OTP_PROVIDER='${choice}'. Supported: mock, dev. ` +
           `Add a new case here when introducing a real SMS provider.`,
       );
   }
@@ -141,22 +159,8 @@ export function getOTPProvider(): OTPProvider {
 
 /**
  * Test-only: forget the cached provider so the next `getOTPProvider()` call
- * re-reads `process.env.OTP_PROVIDER`. Production code should never need this.
+ * re-reads the environment. Production code should never need this.
  */
 export function __resetOTPProviderForTests(): void {
   cached = null;
 }
-
-/**
- * Backwards-compatible helper for callers that still ask "is this code the
- * demo code?". Internally stateless — safe to call without going through the
- * provider cache.
- *
- * @deprecated Call `getOTPProvider().verify(phone, code)` from the auth
- * routes instead. Kept exported only so older imports keep compiling.
- */
-export function verifyCode(code: string): boolean {
-  return code === DevOTPProvider.DEMO_CODE;
-}
-
-export const DEMO_VERIFY_CODE = DevOTPProvider.DEMO_CODE;

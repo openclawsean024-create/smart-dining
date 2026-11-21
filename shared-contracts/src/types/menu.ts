@@ -49,3 +49,31 @@ export interface MenuItem {
   tags?: string | null;
   customizationGroups?: CustomizationGroup[];
 }
+
+/**
+ * 後台菜單管理用的品項（AC-005；只有店長看得到成本與庫存）。
+ */
+export interface AdminMenuItem extends MenuItem {
+  sku: string | null;
+  cost: number;
+  /** null＝不追蹤庫存 */
+  stock: number | null;
+  reorderLevel: number;
+  /** stock 不為 null 且 ≤ reorderLevel */
+  lowStock: boolean;
+  categoryName: string;
+}
+
+/** 新增／編輯品項的輸入（AC-005）。編輯時所有欄位皆可省略。 */
+export interface MenuItemInput {
+  categoryId: string;
+  name: string;
+  basePrice: number;
+  cost?: number;
+  stock?: number | null;
+  reorderLevel?: number;
+  sku?: string | null;
+  description?: string | null;
+  imageUrl?: string | null;
+  available?: boolean;
+}

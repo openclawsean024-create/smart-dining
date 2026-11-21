@@ -7,6 +7,8 @@
  * 若瀏覽器直接連(無 proxy),可改為 import.meta.env.VITE_API_BASE。
  */
 
+import { useStaffStore } from '../store/staffStore';
+
 const API_BASE: string = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '');
 
 export class ApiError extends Error {
@@ -21,8 +23,17 @@ export class ApiError extends Error {
   }
 }
 
-/** 從 localStorage 取得 JWT(若有)。 */
-function getAuthToken(): string | null {
+/**
+ * 呼叫時使用哪一種身分:
+ *   - 'member'(預設):顧客會員 JWT(localStorage,結帳登入後才有)
+ *   - 'staff':員工 JWT(staffStore;後台 / KDS / 菜單管理)
+ *   - 'none':不帶 Authorization
+ */
+export type AuthMode = 'member' | 'staff' | 'none';
+
+function getAuthToken(mode: AuthMode): string | null {
+  if (mode === 'none') return null;
+  if (mode === 'staff') return useStaffStore.getState().token;
   try {
     return localStorage.getItem('kiosk_token');
   } catch {
@@ -35,8 +46,10 @@ interface RequestOptions {
   body?: unknown;
   /** 額外 header(會與 Authorization 合併) */
   headers?: Record<string, string>;
-  /** 關閉自動加 Authorization(用於 /api/auth/login、/api/auth/verify) */
+  /** 關閉自動加 Authorization(用於 /api/auth/login、/api/auth/verify);等同 auth: 'none' */
   noAuth?: boolean;
+  /** 使用哪一種身分的 token,預設 'member' */
+  auth?: AuthMode;
   /** 逾時(ms),預設 15000 */
   timeoutMs?: number;
 }
@@ -49,6 +62,7 @@ function buildUrl(path: string): string {
 
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, headers = {}, noAuth = false, timeoutMs = 15000 } = opts;
+  const authMode: AuthMode = noAuth ? 'none' : (opts.auth ?? 'member');
 
   const finalHeaders: Record<string, string> = {
     Accept: 'application/json',
@@ -57,10 +71,8 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   if (body !== undefined && !(body instanceof FormData)) {
     finalHeaders['Content-Type'] = 'application/json';
   }
-  if (!noAuth) {
-    const token = getAuthToken();
-    if (token) finalHeaders['Authorization'] = 'Bearer ' + token;
-  }
+  const token = getAuthToken(authMode);
+  if (token) finalHeaders['Authorization'] = 'Bearer ' + token;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -97,10 +109,18 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   }
 
   if (!res.ok) {
+    // 員工 token 失效(過期、帳號停用)→ 清掉登入狀態,畫面會回到員工登入頁
+    if (res.status === 401 && authMode === 'staff' && token) {
+      useStaffStore.getState().clear();
+    }
+    const obj = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    // 後端錯誤格式為 { error: string };Fastify 內建錯誤為 { message: string }
     const message =
-      parsed && typeof parsed === 'object' && 'message' in parsed
-        ? String((parsed as Record<string, unknown>).message)
-        : res.statusText || 'Request failed';
+      obj && typeof obj.error === 'string' && obj.error !== 'Internal Server Error'
+        ? obj.error
+        : obj && typeof obj.message === 'string'
+          ? obj.message
+          : res.statusText || 'Request failed';
     throw new ApiError(message, res.status, parsed);
   }
 

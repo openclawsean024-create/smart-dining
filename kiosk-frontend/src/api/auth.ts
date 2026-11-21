@@ -2,7 +2,7 @@
  * 認證 API(會員手機 + 驗證碼登入)
  *
  * Demo 流程:
- *   1. POST /api/auth/login { phone } → 回傳驗證碼(1234)
+ *   1. POST /api/auth/login { phone } → 寄出一次性 6 位數驗證碼(開發／測試環境會在回應中提示)
  *   2. POST /api/auth/verify { phone, code } → 回傳 JWT + Member
  */
 

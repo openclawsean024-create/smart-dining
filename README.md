@@ -56,7 +56,7 @@ flowchart LR
 | **Mobile APP** | React 18 / Vite / TypeScript / Tailwind CSS + PWA(手機 375×812) |
 | **跨端共享** | TypeScript contracts package(`@smart-dining/contracts`) |
 | **即時通訊** | Socket.IO(`/tracking` namespace,`order:${orderNo}` room) |
-| **認證** | JWT(HS256)+ bcrypt;Demo 驗證碼固定 `1234` |
+| **認證** | JWT(HS256)+ bcrypt;會員為一次性 6 位數驗證碼(開發／測試環境會顯示在畫面與 API 回應中;正式環境需接真實簡訊,FR-085) |
 | **開發維運** | npm workspaces / tsx watch / `scripts/start-all.sh` |
 
 ---
@@ -123,7 +123,7 @@ smart-dining/
 ### 一鍵啟動(三個服務一起跑)
 
 ```bash
-cd "/Users/sean/Documents/Agent space/smart-dining"
+cd "<smart-dining repo 路徑>"
 ./scripts/start-all.sh
 ```
 
@@ -144,8 +144,8 @@ cd "/Users/sean/Documents/Agent space/smart-dining"
    └─ Backend API: http://localhost:4000
 
 📋 Demo 帳號:
-   VIP  會員: 0912345678 / 驗證碼 1234
-   一般會員: 0987654321 / 驗證碼 1234
+   VIP  會員: 0900000001(驗證碼顯示在畫面上)
+   一般會員: 0900000002
 
 📊 日誌位置: ./.logs/
 🛑 停止服務: ./scripts/stop-all.sh
@@ -155,23 +155,23 @@ cd "/Users/sean/Documents/Agent space/smart-dining"
 
 ```bash
 # Terminal 1 — Backend
-cd "/Users/sean/Documents/Agent space/smart-dining/backend"
+cd "<smart-dining repo 路徑>/backend"
 npm run db:reset      # 首次需要:建立 DB + 種子(2 個會員 + 10 個菜單)
 npm run dev            # tsx watch src/server.ts → http://localhost:4000
 
 # Terminal 2 — KIOSK
-cd "/Users/sean/Documents/Agent space/smart-dining/kiosk-frontend"
+cd "<smart-dining repo 路徑>/kiosk-frontend"
 npm run dev            # Vite → http://localhost:5173
 
 # Terminal 3 — Mobile
-cd "/Users/sean/Documents/Agent space/smart-dining/mobile-app"
+cd "<smart-dining repo 路徑>/mobile-app"
 npm run dev            # Vite → http://localhost:5174
 ```
 
 ### 停止所有服務
 
 ```bash
-cd "/Users/sean/Documents/Agent space/smart-dining"
+cd "<smart-dining repo 路徑>"
 ./scripts/stop-all.sh
 ```
 
@@ -196,10 +196,10 @@ cd "/Users/sean/Documents/Agent space/smart-dining"
 
 | 角色 | 電話 | 驗證碼 | 點數 | 優惠券 |
 |------|------|--------|------|--------|
-| **VIP 會員 王小明** | `0912345678` | `1234` | 500 點 | `VIP10`(9 折,百分比) |
-| **一般會員 林小華** | `0987654321` | `1234` | 50 點 | `WELCOME`(NT$20 折抵) |
+| **VIP 會員 測試會員甲** | `0900000001` | 一次性 | 500 點 | `VIP10`(9 折,百分比) |
+| **一般會員 測試會員乙** | `0900000002` | 一次性 | 50 點 | `WELCOME`(NT$20 折抵) |
 
-> Demo 階段驗證碼固定為 `1234`;正式版會接 SMS gateway。詳細會員資料可從 `backend/src/seed.ts` 調整。
+> 驗證碼為一次性 6 位數驗證碼(開發／測試環境會顯示在畫面與 API 回應中;正式環境需接真實簡訊,FR-085)。詳細會員資料可從 `backend/src/seed.ts` 調整。
 
 ---
 
@@ -269,8 +269,8 @@ gh repo create smart-dining --public --source=. --push
 
 ## 🛑 常見問題(FAQ)
 
-**Q: 為什麼驗證碼固定 `1234`?**
-A: Demo 階段簡化流程,讓評審委員不用真的收 SMS 也能登入。生產環境會接 SMS gateway(Twilio / Every8d / 三竹資訊),邏輯集中在 `backend/src/lib/verifyCode.ts`,替換為 OTP provider 即可。
+**Q: 驗證碼從哪裡來?**
+A: 目前是一次性 6 位數驗證碼(`MockOTPProvider`),開發／測試環境會直接顯示在畫面上,不用真的收簡訊;正式環境會拒絕啟用此 provider。生產環境會接 SMS gateway(Twilio / Every8d / 三竹資訊),邏輯集中在 `backend/src/lib/verifyCode.ts`,替換為 OTP provider 即可。
 
 **Q: SQLite 是否適合正式上線?**
 A: 原型 / MVP / Demo 適用。**高併發或多門市**請改 PostgreSQL,**Prisma schema 不變**,只需:

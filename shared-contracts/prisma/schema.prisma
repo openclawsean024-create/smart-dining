@@ -62,6 +62,12 @@ model MenuItem {
   description String?
   available   Boolean @default(true)
   tags        String?
+  // AC-005 菜單管理（改寫自 pos-system Product：sku／cost／stock／reorderLevel）
+  sku          String?             // 條碼／SKU（未刪除的品項之間不可重複，由 API 檢查）
+  cost         Float     @default(0) // 成本
+  stock        Int?                // 庫存；null＝不追蹤庫存
+  reorderLevel Int       @default(10) // 低庫存警示門檻
+  deletedAt    DateTime?           // 軟刪除；歷史訂單仍可關聯
 
   category            Category             @relation(fields: [categoryId], references: [id])
   customizationGroups CustomizationGroup[]
@@ -99,6 +105,8 @@ model Order {
   discount          Float     @default(0)
   status            String    @default("QUEUED")
   pickupNumber      Int
+  couponId          String?   // 使用的優惠券（取消訂單時退回）
+  pointsEarned      Int       @default(0) // 這張訂單給會員的點數（取消時扣回）
   estimatedReadyAt  DateTime
   createdAt         DateTime  @default(now())
   completedAt       DateTime?
@@ -141,4 +149,18 @@ model PointsTransaction {
   createdAt DateTime @default(now())
 
   member Member @relation(fields: [memberId], references: [id])
+}
+
+// ============================================================
+// Staff（AC-011）— 員工帳號與角色。密碼只存 bcrypt 雜湊，不存明碼。
+// role: MANAGER（店長）| CASHIER（收銀）| KITCHEN（內場）
+// ============================================================
+model Staff {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String
+  role         String
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
 }

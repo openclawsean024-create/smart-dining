@@ -40,7 +40,7 @@
 4. 選「**白飯 + 醬油 + 薯條 +$30**」→ 加入購物車
 5. 加入「**可樂(中)$30**」、「**塔香脆雞 $149**」
 6. 右側購物車顯示品項清單 + 小計 **$209**
-7. 點「**前往結帳**」→ 輸入電話 `0912345678` → 驗證碼 `1234` → 登入 VIP
+7. 點「**前往結帳**」→ 輸入電話 `0900000001` → 輸入畫面顯示的 6 位數驗證碼 → 登入 VIP
 8. 看到 **VIP10 coupon** → 確認結帳
 9. 完成畫面:**取餐號 A002** 大字 + 訂單編號 `SD-20260824-0002` + QR code(顧客手機掃)
 
@@ -151,7 +151,7 @@
 - [ ] `curl http://localhost:4000/healthz` → `{ "ok": true }`
 - [ ] `curl -I http://localhost:5173` → 200 OK
 - [ ] `curl -I http://localhost:5174` → 200 OK
-- [ ] Demo 帳號 `0912345678` / `0987654321` 已 seed(預設 500 / 50 點)
+- [ ] Demo 帳號 `0900000001` / `0900000002` 已 seed(預設 500 / 50 點)
 - [ ] 手機 QR code 掃描器已備(可用 `kiosk-frontend` 完成頁的 QR)
 - [ ] 筆電 `/admin` 後台可看到預建訂單 A001
 - [ ] 平板 1024×768 直式,瀏覽器全螢幕(F11)
@@ -160,8 +160,8 @@
 
 ## 常見 Q&A(委員可能問的)
 
-**Q: 為什麼驗證碼固定 1234?**
-A: Demo 階段簡化。**生產環境會接 SMS gateway**(Twilio / 三竹資訊),邏輯集中在 `backend/src/lib/verifyCode.ts`,替換 OTP provider 即可,前端不需改。
+**Q: 驗證碼從哪裡來?**
+A: 目前是一次性 6 位數驗證碼,開發環境直接顯示在畫面上。**生產環境會接 SMS gateway**(Twilio / 三竹資訊),邏輯集中在 `backend/src/lib/verifyCode.ts`,替換 OTP provider 即可,前端不需改。
 
 **Q: SQLite 撐得住嗎?**
 A: 原型 / MVP / 單店適用。**多門市 + 高併發**請改 PostgreSQL,**Prisma schema 不變**,只需改 `DATABASE_URL` + `prisma migrate dev`。
