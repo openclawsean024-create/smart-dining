@@ -105,6 +105,8 @@ model Order {
   discount          Float     @default(0)
   status            String    @default("QUEUED")
   pickupNumber      Int
+  couponId          String?   // 使用的優惠券（取消訂單時退回）
+  pointsEarned      Int       @default(0) // 這張訂單給會員的點數（取消時扣回）
   estimatedReadyAt  DateTime
   createdAt         DateTime  @default(now())
   completedAt       DateTime?

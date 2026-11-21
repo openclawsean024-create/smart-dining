@@ -8,5 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { TEMPLATE_DB_PATH } from './paths.js';
 
 process.env.NODE_ENV = 'test';
+// 測試要從 login 回應取得驗證碼（預設不回傳，見 auth/routes.ts shouldExposeOtpHint）
+process.env.OTP_EXPOSE_HINT = '1';
 process.env.JWT_SECRET ??= randomBytes(32).toString('hex');
 process.env.DATABASE_URL = 'file:' + TEMPLATE_DB_PATH;

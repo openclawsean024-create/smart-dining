@@ -15,13 +15,26 @@
 | AC-004 | 後台訂單清單與 KDS | ✅ 完成（2026-11-16） | `backend/src/modules/admin.orders.ac004.test.ts`（13 個 case）；`kiosk-frontend/src/pages/admin/__tests__/KdsPage.ac004.test.tsx`（20 個 case，含 restaurant-kiosk 的 6 個 KDS 情境）；Playwright `e2e/kds-flow.ac004.spec.ts`（2 個 case） |
 | AC-005 | 菜單管理 | ✅ 完成（2026-11-16） | `backend/src/modules/menu.admin.ac005.test.ts`（29 個 case）；`kiosk-frontend/src/pages/admin/__tests__/MenuAdminPage.ac005.test.tsx`（12 個 case）；Playwright `e2e/menu-admin.ac005.spec.ts`（2 個 case） |
 
+### PR #3 審查修正（2026-11-22，Claude Code 子代理獨立審查）
+
+| # | 問題 | 修正 | 測試 |
+|---|---|---|---|
+| 1 | 正式環境（`NODE_ENV=production`）啟動時拋錯，合併部署後後端會重啟循環；Railway 每次啟動都跑破壞性 seed | 後端照常啟動，只有 `/api/auth/*` 回 503（`OTP_UNAVAILABLE`）；`backend/railway.json` 移除 `db:seed` | `review.fixes.ac011.test.ts` |
+| 2 | 非正式環境的 login API 直接回傳驗證碼，staging／demo 任何人可冒用會員；猜錯一次就作廢可被拿來阻擋別人登入 | 只有 `OTP_EXPOSE_HINT=1`（測試、本機 `start-all.sh`）才回傳；猜錯 5 次才作廢；驗證碼改用 `crypto.randomInt` | 同上、`authz.ac011.test.ts` |
+| 3 | 訂單狀態可任意改（完成後改回排隊、完成後取消）；取消不退庫存與優惠券 | 合法轉換表（製作階段只能往前、COMPLETED 只能從 READY、終態不可改），違反回 409；以條件更新防並行；取消時退回庫存、優惠券、這張訂單給的點數（`Order` 新增 `couponId`、`pointsEarned`） | `review.fixes.ac011.test.ts` |
+| 5 | 員工登入失敗上限可被並行請求繞過；只憑帳號名稱就能鎖住店長 | 比對前先預約嘗試次數；改為帳號＋IP 5 次、IP 20 次、帳號 50 次；`TRUST_PROXY` 讓反向代理後取得真實 IP | `review.fixes.ac011.test.ts` |
+| 6 | KIOSK 會員結帳後沒有登出，下一位顧客沿用上一位身分 | 下單成功即登出 | `CheckoutPage.ac002.test.tsx` |
+
+審查第 4 項（點數在下單時就入帳、沒有交易紀錄）屬點數功能，留到下一階段；本次只做到取消時扣回。
+既有測試的調整（行為依審查變更，未放寬）：`authz.ac011.test.ts` 的「猜錯一次就作廢」改為「猜錯不影響本人、連錯 5 次才作廢」；狀態測試補上 READY 步驟，並新增「已完成不能取消」的 409 斷言。
+
 ### SOP 檢查結果（2026-11-16，本機 Node v26.13.1／npm 11.20.0，`feat/m1-a`）
 
 | 指令 | 結果 |
 |---|---|
 | `npm ci` | exit 0（673 個套件） |
 | `npm run build` | exit 0（contracts → backend → kiosk → mobile） |
-| `npm test` | exit 0：backend 10 檔 192 個 case、kiosk 4 檔 47 個 case 全數通過（Node 26 與 Node 20 皆實跑） |
+| `npm test` | exit 0：backend 11 檔 205 個 case、kiosk 4 檔 48 個 case 全數通過（Node 26 與 Node 20 皆實跑） |
 | `cd backend && npx tsc --noEmit` | exit 0 |
 | `npm run lint -w @smart-dining/kiosk` | exit 0 |
 | `npm run typecheck -w @smart-dining/mobile` | exit 0 |

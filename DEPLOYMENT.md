@@ -88,10 +88,10 @@ Railway 會自動偵測 push 重新部署,流程:
 1. `npm ci --include=dev` — 安裝 dev deps(給 prisma 用)
 2. `npm run build` — `prisma generate` + `tsc`(產出 dist/)
 3. `npm run db:push` — 同步 schema 到 Postgres
-4. `npm run db:seed` — 寫入 demo 資料(⚠️ 每次啟動會清空再重建,demo 用)
+4. (已移除)啟動時不再執行 `npm run db:seed`:seed 會清空訂單、會員與員工資料。第一次部署需要示範資料時,手動執行一次 `npm run db:seed`。
 5. `npm start` — `node dist/server.js`
 
-> ⚠️ **Seed 是破壞性的**:每次重啟都會清空資料再寫入 demo 資料。正式營運請把 `npm run db:seed` 從 startCommand 移除,改成用 prisma migrate 管理正式資料。
+> ⚠️ **Seed 是破壞性的**:會清空資料再寫入 demo 資料,因此已從 `backend/railway.json` 的 startCommand 移除。正式環境(`NODE_ENV=production`)在接上真實簡訊 provider(FR-085)之前,會員登入 API 回 503,其餘功能正常。
 
 ### 2.5 取得 Backend 網址
 

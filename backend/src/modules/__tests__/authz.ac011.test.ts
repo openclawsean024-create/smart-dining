@@ -137,7 +137,7 @@ describe('AC-011 員工登入與密碼雜湊', () => {
     }
   });
 
-  it('AC-011 會員登入不再接受固定驗證碼 1234：只有這次寄出的一次性驗證碼有效', async () => {
+  it('AC-011 會員登入不再接受固定驗證碼 1234：只有這次寄出的一次性驗證碼有效，連錯 5 次才作廢', async () => {
     const phone = '0900000199';
     const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { phone } });
     expect(login.statusCode).toBe(200);
@@ -146,13 +146,21 @@ describe('AC-011 員工登入與密碼雜湊', () => {
 
     const fixed = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: '1234' } });
     expect(fixed.statusCode).toBe(401);
-    // 猜錯一次就作廢，原本寄出的碼也不能再用
+    // 猜錯不會讓本人的驗證碼失效（否則任何人都能讓別人無法登入）
     const afterGuess = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: sent } });
-    expect(afterGuess.statusCode).toBe(401);
+    expect(afterGuess.statusCode).toBe(200);
+    // 一次性：用過就不能再用
+    const reused = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: sent } });
+    expect(reused.statusCode).toBe(401);
 
+    // 連續猜錯 5 次才作廢
     const again = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { phone } });
-    const ok = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: again.json().code } });
-    expect(ok.statusCode).toBe(200);
+    for (let i = 0; i < 5; i++) {
+      const wrong = String((Number(again.json().code) + 1 + i) % 1_000_000).padStart(6, '0');
+      expect((await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: wrong } })).statusCode).toBe(401);
+    }
+    const voided = await app.inject({ method: 'POST', url: '/api/auth/verify', payload: { phone, code: again.json().code } });
+    expect(voided.statusCode).toBe(401);
   });
 
   it('AC-011 連續登入失敗達上限後回 429', async () => {
@@ -339,16 +347,24 @@ describe('AC-011 訂單推進與狀態 API 需員工角色', () => {
     const url = `/api/orders/${orderNo}/status`;
     const k = await app.inject({ method: 'PATCH', url, headers: kitchen.headers, payload: { status: 'COOKING', changedBy: 'spoofed' } });
     expect(k.statusCode).toBe(200);
+    // 完成取餐只能從 READY（狀態轉換規則，見 orders.transitions.test.ts）
+    const r = await app.inject({ method: 'PATCH', url, headers: kitchen.headers, payload: { status: 'READY' } });
+    expect(r.statusCode).toBe(200);
     const c = await app.inject({ method: 'PATCH', url, headers: cashier.headers, payload: { status: 'COMPLETED' } });
     expect(c.statusCode).toBe(200);
     expect(c.json().order.completedAt).toBeTruthy();
-    const m = await app.inject({ method: 'PATCH', url, headers: manager.headers, payload: { status: 'CANCELLED' } });
+    // 已完成的訂單不能再取消；店長取消用另一張進行中的訂單
+    expect((await app.inject({ method: 'PATCH', url, headers: manager.headers, payload: { status: 'CANCELLED' } })).statusCode).toBe(409);
+    const other = await newOrder();
+    const m = await app.inject({ method: 'PATCH', url: `/api/orders/${other}/status`, headers: manager.headers, payload: { status: 'CANCELLED' } });
     expect(m.statusCode).toBe(200);
+    const otherLogs = await app.prisma.orderStatusLog.findMany({ where: { order: { orderNo: other } } });
+    expect(otherLogs.map((l) => l.changedBy)).toContain('staff:' + manager.id);
 
     const logs = await app.prisma.orderStatusLog.findMany({ where: { order: { orderNo } } });
     expect(logs.map((l) => l.changedBy)).not.toContain('spoofed');
     expect(logs.map((l) => l.changedBy)).toEqual(
-      expect.arrayContaining(['staff:' + kitchen.id, 'staff:' + cashier.id, 'staff:' + manager.id]),
+      expect.arrayContaining(['staff:' + kitchen.id, 'staff:' + cashier.id]),
     );
   });
 

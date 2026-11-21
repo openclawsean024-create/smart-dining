@@ -48,7 +48,7 @@ if [ -f "$PIDS_DIR/backend.pid" ] && kill -0 "$(cat "$PIDS_DIR/backend.pid")" 2>
 else
   echo "▶ 啟動 backend..."
   cd "$PROJECT_ROOT/backend"
-  nohup npm run dev >"$LOGS_DIR/backend.log" 2>&1 &
+  OTP_EXPOSE_HINT=1 nohup npm run dev >"$LOGS_DIR/backend.log" 2>&1 &
   echo $! >"$PIDS_DIR/backend.pid"
 fi
 

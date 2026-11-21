@@ -51,6 +51,23 @@ const STATUS_BY_ROLE: Record<StaffRole, readonly OrderStatus[]> = {
   CASHIER: ['COMPLETED', 'CANCELLED'],
 };
 
+/**
+ * 訂單狀態的合法轉換。製作階段只能往前（可跳階）；COMPLETED 只能從 READY；
+ * 進行中的訂單可以取消；COMPLETED 與 CANCELLED 是終態，不能再改。
+ */
+const PRODUCTION_FLOW: readonly OrderStatus[] = ['QUEUED', 'PREPARING', 'COOKING', 'PLATING', 'READY'];
+
+export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
+  if (from === 'COMPLETED' || from === 'CANCELLED') return false;
+  if (to === 'CANCELLED') return true;
+  if (to === 'COMPLETED') return from === 'READY';
+  const i = PRODUCTION_FLOW.indexOf(from);
+  const j = PRODUCTION_FLOW.indexOf(to);
+  return i >= 0 && j > i;
+}
+
+class TransitionConflict extends Error {}
+
 const orderRoutes: FastifyPluginAsync = async (app) => {
   const enqueueOrderWrite = createSerialQueue();
   /**
@@ -148,6 +165,8 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
             subtotal: priced.subtotal,
             discount,
             pickupNumber,
+            couponId: coupon?.id ?? null,
+            pointsEarned: memberId ? Math.floor(priced.subtotal) : 0,
             createdAt: now,
             estimatedReadyAt: new Date(now.getTime() + 195000),
             items: {
@@ -219,17 +238,43 @@ const orderRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(403).send({ error: 'Forbidden: role cannot set this status' });
     }
 
-    const current = await app.prisma.order.findUnique({ where: { orderNo } });
+    const current = await app.prisma.order.findUnique({ where: { orderNo }, include: { items: true } });
     if (!current) return reply.code(404).send({ error: 'not found' });
+    const conflict = () =>
+      reply.code(409).send({ error: `cannot change order status from ${current.status} to ${body.status}`, code: 'INVALID_TRANSITION' });
+    if (!canTransition(current.status as OrderStatus, body.status)) return conflict();
 
-    const order = await app.prisma.$transaction(async (tx) => {
-      await tx.orderStatusLog.create({ data: { orderId: current.id, status: body.status, changedBy: 'staff:' + user.sub } });
-      return tx.order.update({
-        where: { orderNo },
-        data: { status: body.status, completedAt: body.status === 'COMPLETED' ? new Date() : undefined },
-        include: { items: true, statusLogs: true },
+    let order;
+    try {
+      order = await app.prisma.$transaction(async (tx) => {
+        // 以「狀態仍是剛才讀到的值」為條件更新，並行的兩個請求只有一個會成功
+        const moved = await tx.order.updateMany({
+          where: { id: current.id, status: current.status },
+          data: { status: body.status, completedAt: body.status === 'COMPLETED' ? new Date() : undefined },
+        });
+        if (moved.count !== 1) throw new TransitionConflict();
+        await tx.orderStatusLog.create({ data: { orderId: current.id, status: body.status, changedBy: 'staff:' + user.sub } });
+
+        if (body.status === 'CANCELLED') {
+          // 取消：退回庫存（只限有追蹤庫存、未刪除的品項）、優惠券與這張訂單給的點數
+          const qtyByItem = new Map<string, number>();
+          for (const it of current.items) qtyByItem.set(it.menuItemId, (qtyByItem.get(it.menuItemId) ?? 0) + it.quantity);
+          for (const [menuItemId, qty] of qtyByItem) {
+            await tx.menuItem.updateMany({ where: { id: menuItemId, stock: { not: null } }, data: { stock: { increment: qty } } });
+          }
+          if (current.couponId) await tx.coupon.updateMany({ where: { id: current.couponId }, data: { usedAt: null } });
+          if (current.memberId && current.pointsEarned > 0) {
+            const member = await tx.member.findUnique({ where: { id: current.memberId }, select: { points: true } });
+            const back = Math.min(current.pointsEarned, member?.points ?? 0);
+            if (back > 0) await tx.member.update({ where: { id: current.memberId }, data: { points: { decrement: back } } });
+          }
+        }
+        return tx.order.findUniqueOrThrow({ where: { id: current.id }, include: { items: true, statusLogs: true } });
       });
-    });
+    } catch (e) {
+      if (e instanceof TransitionConflict) return conflict();
+      throw e;
+    }
     broadcastStatusChange(app, order, body.status);
     return { order: serializeOrder(order) };
   });

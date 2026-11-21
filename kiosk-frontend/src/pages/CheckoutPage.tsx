@@ -221,6 +221,8 @@ export function CheckoutPage() {
       };
       const res = await createOrder(payload);
       clearCart();
+      // KIOSK 是共用機台：下單完成就登出會員，下一位顧客不會沿用上一位的身分與優惠券
+      logout();
       setLatestOrderNo(res.order.orderNo);
       close();
       navigate('/complete/' + encodeURIComponent(res.order.orderNo), {

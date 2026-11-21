@@ -21,9 +21,15 @@ export interface BuildAppOptions {
 }
 
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
-  // OTP 設定錯誤（例如正式環境仍用 mock／dev）時在啟動就失敗，而不是等到第一次登入（AC-011）
-  getOTPProvider();
-  const app = Fastify({ logger: opts.logger ?? true });
+  // 在 Railway 等反向代理之後才信任 X-Forwarded-For（員工登入的 IP 限制要用到真實 IP）
+  const app = Fastify({ logger: opts.logger ?? true, trustProxy: env.TRUST_PROXY });
+  // OTP 設定錯誤（例如正式環境尚未接真實簡訊）只停用會員登入（/api/auth/* 回 503），
+  // 不讓整個後端起不來；啟動時先記錄警告方便發現。
+  try {
+    getOTPProvider();
+  } catch (e) {
+    app.log.warn({ err: e }, '[OTP] member login disabled');
+  }
   await app.register(cors, { origin: env.CORS_ORIGIN.split(',') });
   await app.register(prismaPlugin, { databaseUrl: opts.databaseUrl });
   await app.register(authPlugin);

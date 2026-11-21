@@ -4,7 +4,8 @@
  * AC-011：不再有任何寫死的預設驗證碼（舊版對所有手機號碼都接受 '1234'，
  * 知道這個碼的人可以冒用任何會員登入）。
  *
- * - `MockOTPProvider`（預設）：每次寄送產生隨機 6 位數、一次性、5 分鐘有效的驗證碼。
+ * - `MockOTPProvider`（預設）：每次寄送產生隨機 6 位數（crypto）、一次性、5 分鐘有效的驗證碼；
+ *   連續猜錯 MAX_ATTEMPTS 次才作廢（猜錯一次就作廢的話，任何人都能讓別人的驗證碼失效）。
  * - `DevOTPProvider`：固定驗證碼，只在明確設定 `OTP_PROVIDER=dev` 且以
  *   `OTP_DEV_CODE` 提供驗證碼時才可用（本機手動測試用），repo 內不寫死任何值。
  * - 正式環境（NODE_ENV=production）拒絕使用上述兩者：真實簡訊 provider（FR-085，M2）
@@ -12,6 +13,8 @@
  *
  * 新增真實簡訊供應商時，實作 OTPProvider 並在 getOTPProvider() 加一個 case 即可。
  */
+
+import { randomInt } from 'node:crypto';
 
 export interface OTPSendResult {
   /** Identifier returned by the upstream provider (e.g. an SMS message id). */
@@ -66,6 +69,7 @@ export class DevOTPProvider implements OTPProvider {
 interface MockOTPEntry {
   code: string;
   expiresAt: number;
+  failures: number;
 }
 
 /**
@@ -76,12 +80,14 @@ interface MockOTPEntry {
 export class MockOTPProvider implements OTPProvider {
   static readonly CODE_LENGTH = 6;
   static readonly TTL_MS = 5 * 60 * 1000;
+  /** 同一組驗證碼最多可猜錯幾次；達上限即作廢，需重新寄送。 */
+  static readonly MAX_ATTEMPTS = 5;
 
   private store = new Map<string, MockOTPEntry>();
 
   private generateCode(): string {
     const max = 10 ** MockOTPProvider.CODE_LENGTH;
-    const n = Math.floor(Math.random() * max);
+    const n = randomInt(0, max);
     return n.toString().padStart(MockOTPProvider.CODE_LENGTH, '0');
   }
 
@@ -90,6 +96,7 @@ export class MockOTPProvider implements OTPProvider {
     this.store.set(phone, {
       code,
       expiresAt: Date.now() + MockOTPProvider.TTL_MS,
+      failures: 0,
     });
     return { devHint: code };
   }
@@ -97,11 +104,19 @@ export class MockOTPProvider implements OTPProvider {
   async verify(phone: string, code: string): Promise<boolean> {
     const entry = this.store.get(phone);
     if (!entry) return false;
-    // One-time: remove on access regardless of outcome so a guess attempt
-    // also consumes the code (avoids brute-force replay).
-    this.store.delete(phone);
-    if (entry.expiresAt < Date.now()) return false;
-    return entry.code === code;
+    if (entry.expiresAt < Date.now()) {
+      this.store.delete(phone);
+      return false;
+    }
+    if (entry.code === code) {
+      // 一次性：驗證成功即刪除
+      this.store.delete(phone);
+      return true;
+    }
+    // 猜錯：累計次數，達上限才作廢（6 位數、最多 5 次，猜中機率 0.0005%）
+    entry.failures += 1;
+    if (entry.failures >= MockOTPProvider.MAX_ATTEMPTS) this.store.delete(phone);
+    return false;
   }
 }
 

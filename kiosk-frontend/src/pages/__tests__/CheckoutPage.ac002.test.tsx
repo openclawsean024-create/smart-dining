@@ -155,6 +155,27 @@ describe('AC-002 下單只送品項 ID、數量、選項 ID', () => {
     expect(String(init!.body)).not.toMatch(/unitPrice|basePrice|subtotal|totalAmount|測試餐點/);
   });
 
+  it('AC-011 共用機台:會員下單成功後自動登出,下一位顧客不會沿用上一位的身分', async () => {
+    loginAsMember();
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/coupons')) return jsonResponse(200, { coupons: [] });
+      return jsonResponse(201, {
+        order: { id: 'o2', orderNo: 'SD-20260101-0002', totalAmount: 270, subtotal: 270, discount: 0, status: 'QUEUED', pickupNumber: 2, estimatedReadyAt: '2026-01-01T00:05:00.000Z', createdAt: '2026-01-01T00:00:00.000Z', items: [] },
+      });
+    });
+    renderCheckout();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/coupons'))).toBe(true));
+    await userEvent.click(screen.getByRole('button', { name: /確認結帳/ }));
+
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u, i]) => String(u).endsWith('/api/orders') && i?.method === 'POST')).toBe(true));
+    const orderCall = fetchMock.mock.calls.find(([u, i]) => String(u).endsWith('/api/orders') && i?.method === 'POST')!;
+    // 下單時仍帶這位會員的 JWT
+    expect((orderCall[1]!.headers as Record<string, string>).Authorization).toBe('Bearer member-jwt');
+    await waitFor(() => expect(localStorage.getItem('kiosk_token')).toBeNull());
+    expect(localStorage.getItem('kiosk_session')).toBeNull();
+  });
+
   it('AC-002 後端回 400(例如品項已下架)時顯示中文說明,不清空購物車', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(400, { error: 'ITEM_UNAVAILABLE: menu item item-test is not available', code: 'ITEM_UNAVAILABLE' }));
     renderCheckout();
